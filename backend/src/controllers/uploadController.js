@@ -30,12 +30,8 @@ export async function uploadFileHandler(req, res) {
       });
     }
 
-    if (!propertyName) {
-      return res.status(400).json({
-        error: 'Property name required',
-        message: `Please provide propertyName in the request. Received: ${JSON.stringify(req.body)}`
-      });
-    }
+    // Use propertyCode as fallback if propertyName is empty
+    const finalPropertyName = propertyName || propertyCode;
 
     const file = req.file;
 
@@ -45,12 +41,12 @@ export async function uploadFileHandler(req, res) {
       file.originalname,
       file.mimetype,
       propertyCode,
-      propertyName,
+      finalPropertyName,
       subfolder || 'الصور الرئيسية'
     );
 
     console.log(`📤 Uploaded: ${file.originalname} → ${result.fileName}`);
-    console.log(`   Property: ${propertyCode} - ${propertyName} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
+    console.log(`   Property: ${propertyCode} - ${finalPropertyName} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
 
     res.json({
       success: true,
@@ -89,22 +85,18 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
-    if (!propertyName) {
-      return res.status(400).json({
-        error: 'Property name required',
-        message: 'Please provide propertyName in the request'
-      });
-    }
+    // Use propertyCode as fallback if propertyName is empty
+    const finalPropertyName = propertyName || propertyCode;
 
     // Upload all files
     const results = await driveService.uploadMultipleFiles(
       req.files,
       propertyCode,
-      propertyName,
+      finalPropertyName,
       subfolder || 'الصور الرئيسية'
     );
 
-    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} - ${propertyName}`);
+    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} - ${finalPropertyName}`);
 
     res.json({
       success: true,

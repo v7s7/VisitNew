@@ -49,14 +49,11 @@ export async function uploadFile(
     if (!propertyCode) {
       throw new Error('Property code is required for upload');
     }
-    if (!propertyName) {
-      throw new Error('Property name is required for upload');
-    }
 
     const formData = new FormData();
     formData.append('file', file);
     formData.append('propertyCode', propertyCode);
-    formData.append('propertyName', propertyName);
+    formData.append('propertyName', propertyName || propertyCode); // Use code as fallback
     if (subfolder) {
       formData.append('subfolder', subfolder);
     }
@@ -64,7 +61,7 @@ export async function uploadFile(
     console.log('📤 Uploading file:', {
       fileName: file.name,
       propertyCode,
-      propertyName,
+      propertyName: propertyName || propertyCode,
       subfolder,
     });
 
