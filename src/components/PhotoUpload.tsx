@@ -16,7 +16,8 @@ export default function PhotoUpload({
   label = 'الصور | Photos',
   multiple = true,
 }: PhotoUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -45,9 +46,7 @@ export default function PhotoUpload({
     }
 
     // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    e.target.value = '';
   };
 
   const handleRemovePhoto = (localId: string) => {
@@ -59,22 +58,36 @@ export default function PhotoUpload({
     onPhotosChange(photos.filter((p) => p.localId !== localId));
   };
 
-  const handleAddClick = () => {
-    fileInputRef.current?.click();
+  const handleCameraClick = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const handleGalleryClick = () => {
+    galleryInputRef.current?.click();
   };
 
   return (
     <div className="photo-upload">
       <label className="photo-upload-label">{label}</label>
 
+      {/* Hidden input for camera */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="photo-input-hidden"
+      />
+
+      {/* Hidden input for gallery */}
+      <input
+        ref={galleryInputRef}
         type="file"
         accept="image/*"
         multiple={multiple}
         onChange={handleFileSelect}
         className="photo-input-hidden"
-        capture="environment"
       />
 
       <div className="photos-grid">
@@ -98,11 +111,20 @@ export default function PhotoUpload({
 
         <button
           type="button"
-          onClick={handleAddClick}
+          onClick={handleCameraClick}
           className="add-photo-button secondary"
         >
           <span className="add-photo-icon">📷</span>
-          <span className="add-photo-text">إضافة صورة</span>
+          <span className="add-photo-text">التقاط صورة | Take Photo</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleGalleryClick}
+          className="add-photo-button secondary"
+        >
+          <span className="add-photo-icon">🖼️</span>
+          <span className="add-photo-text">اختيار من المعرض | Choose from Gallery</span>
         </button>
       </div>
 
