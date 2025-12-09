@@ -13,12 +13,13 @@ export async function uploadFileHandler(req, res) {
       });
     }
 
-    const { propertyCode, propertyName, subfolder } = req.body;
+    const { propertyCode, propertyType, endowedTo, subfolder } = req.body;
 
     console.log('📥 Upload request received:', {
       file: req.file?.originalname,
       propertyCode,
-      propertyName,
+      propertyType,
+      endowedTo,
       subfolder,
       bodyKeys: Object.keys(req.body)
     });
@@ -30,9 +31,6 @@ export async function uploadFileHandler(req, res) {
       });
     }
 
-    // Use propertyCode as fallback if propertyName is empty
-    const finalPropertyName = propertyName || propertyCode;
-
     const file = req.file;
 
     // Upload to Google Drive
@@ -41,12 +39,13 @@ export async function uploadFileHandler(req, res) {
       file.originalname,
       file.mimetype,
       propertyCode,
-      finalPropertyName,
+      propertyType || '',
+      endowedTo || '',
       subfolder || 'الصور الرئيسية'
     );
 
     console.log(`📤 Uploaded: ${file.originalname} → ${result.fileName}`);
-    console.log(`   Property: ${propertyCode} - ${finalPropertyName} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
+    console.log(`   Property: ${propertyCode} + ${propertyType} + ${endowedTo} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
 
     res.json({
       success: true,
@@ -76,7 +75,7 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
-    const { propertyCode, propertyName, subfolder } = req.body;
+    const { propertyCode, propertyType, endowedTo, subfolder } = req.body;
 
     if (!propertyCode) {
       return res.status(400).json({
@@ -85,18 +84,16 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
-    // Use propertyCode as fallback if propertyName is empty
-    const finalPropertyName = propertyName || propertyCode;
-
     // Upload all files
     const results = await driveService.uploadMultipleFiles(
       req.files,
       propertyCode,
-      finalPropertyName,
+      propertyType || '',
+      endowedTo || '',
       subfolder || 'الصور الرئيسية'
     );
 
-    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} - ${finalPropertyName}`);
+    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} + ${propertyType} + ${endowedTo}`);
 
     res.json({
       success: true,

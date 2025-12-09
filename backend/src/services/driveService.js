@@ -6,7 +6,7 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── "843 - عقار النخيل السكني" (Code + Name)
+ * └── "843 + سكني + الفقراء والمساكين" (Code + PropertyType + EndowedTo)
  *     └── "2024-01-15" (Date)
  *         ├── الصور الرئيسية/ (Main Photos)
  *         │   ├── photo1.jpg
@@ -63,20 +63,20 @@ function sanitizeFolderName(name) {
 
 /**
  * Get organized folder path for uploads
- * Creates: MainFolder/[Code - Name]/Date/subfolder
+ * Creates: MainFolder/[Code + PropertyType + EndowedTo]/Date/subfolder
  */
-async function getOrganizedFolderPath(propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
+async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Create: MainFolder/[Code - Name]
-  const propertyFolderName = sanitizeFolderName(`${propertyCode} - ${propertyName}`);
+  // Create: MainFolder/[Code + PropertyType + EndowedTo]
+  const propertyFolderName = sanitizeFolderName(`${propertyCode} + ${propertyType} + ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code - Name]/Date
+  // Create: MainFolder/[Code + PropertyType + EndowedTo]/Date
   const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
 
-  // Create: MainFolder/[Code - Name]/Date/subfolder
+  // Create: MainFolder/[Code + PropertyType + EndowedTo]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
 
   return subFolderId;
@@ -88,15 +88,16 @@ async function getOrganizedFolderPath(propertyCode, propertyName, subfolder = '�
  * @param {string} fileName - File name
  * @param {string} mimeType - MIME type
  * @param {string} propertyCode - Property code for organization
- * @param {string} propertyName - Property name for organization
+ * @param {string} propertyType - Property type (نوع العقار)
+ * @param {string} endowedTo - Endowed to (موقوف على)
  * @param {string} subfolder - Subfolder name (e.g., 'الصور الرئيسية', 'Finding1 - description')
  */
-export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
+export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   try {
     const drive = await getDriveClient();
 
     // Get organized folder path
-    const folderId = await getOrganizedFolderPath(propertyCode, propertyName, subfolder);
+    const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder);
 
     // Create readable stream from buffer
     const bufferStream = Readable.from(fileBuffer);
@@ -149,9 +150,9 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
 /**
  * Upload multiple files
  */
-export async function uploadMultipleFiles(files, propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
+export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const uploadPromises = files.map(file =>
-    uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyName, subfolder)
+    uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder)
   );
 
   return await Promise.all(uploadPromises);

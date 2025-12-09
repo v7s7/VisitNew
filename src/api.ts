@@ -41,7 +41,8 @@ export async function searchProperties(query: string): Promise<Property[]> {
 export async function uploadFile(
   file: File,
   propertyCode: string,
-  propertyName: string,
+  propertyType: string,
+  endowedTo: string,
   subfolder?: string
 ): Promise<UploadResponse> {
   try {
@@ -53,7 +54,8 @@ export async function uploadFile(
     const formData = new FormData();
     formData.append('file', file);
     formData.append('propertyCode', propertyCode);
-    formData.append('propertyName', propertyName || propertyCode); // Use code as fallback
+    formData.append('propertyType', propertyType || '');
+    formData.append('endowedTo', endowedTo || '');
     if (subfolder) {
       formData.append('subfolder', subfolder);
     }
@@ -61,7 +63,8 @@ export async function uploadFile(
     console.log('📤 Uploading file:', {
       fileName: file.name,
       propertyCode,
-      propertyName: propertyName || propertyCode,
+      propertyType,
+      endowedTo,
       subfolder,
     });
 

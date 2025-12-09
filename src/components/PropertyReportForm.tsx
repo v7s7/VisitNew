@@ -145,7 +145,7 @@ export default function PropertyReportForm() {
       // Upload all photos first
       const uploadMainPhotos = async () => {
         const uploadPromises = mainPhotos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code, selectedProperty.name, 'الصور الرئيسية')
+          uploadFile(photo.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, 'الصور الرئيسية')
         );
         const results = await Promise.all(uploadPromises);
         return mainPhotos.map((photo, index) => ({
@@ -163,7 +163,7 @@ export default function PropertyReportForm() {
         const findingFolderName = `Finding${findingNumber} - ${findingDescription}`;
 
         const uploadPromises = finding.photos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code, selectedProperty.name, findingFolderName)
+          uploadFile(photo.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, findingFolderName)
         );
         const results = await Promise.all(uploadPromises);
         return {
@@ -178,7 +178,7 @@ export default function PropertyReportForm() {
       const uploadComplaintFiles = async () => {
         if (complaintFiles.length === 0) return [];
         const uploadPromises = complaintFiles.map((file) =>
-          uploadFile(file.file, selectedProperty.code, selectedProperty.name, 'ملفات البلاغ')
+          uploadFile(file.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, 'ملفات البلاغ')
         );
         const results = await Promise.all(uploadPromises);
         return complaintFiles.map((file, index) => ({
