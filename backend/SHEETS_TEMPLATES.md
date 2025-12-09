@@ -85,11 +85,14 @@ If you have existing data in CSV format:
 | Z | actions | Actions taken | JSON Array |
 | AA | corrector | Corrector name (optional) | Text |
 | AB | inspectorName | Inspector name (optional) | Text |
+| AC | floorsCount | Number of floors (عدد الطوابق) | Number |
+| AD | flatsCount | Number of flats (عدد الشقق) | Number |
+| AE | additionalNotes | Additional notes (ملاحظات إضافية) | Text |
 
 ### Example Headers (Copy-Paste):
 
 ```
-reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	complaintFilesCount	complaintFiles	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName
+reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	complaintFilesCount	complaintFiles	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName	floorsCount	flatsCount	additionalNotes
 ```
 
 ### Notes:

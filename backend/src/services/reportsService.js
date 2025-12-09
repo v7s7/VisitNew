@@ -31,6 +31,9 @@ import { format } from 'date-fns';
  * Column Z: actions (JSON string)
  * Column AA: corrector
  * Column AB: inspectorName
+ * Column AC: floorsCount (عدد الطوابق)
+ * Column AD: flatsCount (عدد الشقق)
+ * Column AE: additionalNotes (ملاحظات إضافية)
  */
 
 /**
@@ -103,13 +106,16 @@ export async function saveReport(report) {
       report.actions?.length || 0,                 // Y: actionsCount
       actions,                                     // Z: actions
       report.corrector || '',                      // AA: corrector
-      report.inspectorName || ''                   // AB: inspectorName
+      report.inspectorName || '',                  // AB: inspectorName
+      report.floorsCount || '',                    // AC: floorsCount
+      report.flatsCount || '',                     // AD: flatsCount
+      report.additionalNotes || ''                 // AE: additionalNotes
     ];
 
     // Append to sheet
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:AB`,
+      range: `${sheetName}!A:AE`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -143,7 +149,7 @@ export async function getAllReports() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:AB`, // Skip header row
+      range: `${sheetName}!A2:AE`, // Skip header row
     });
 
     const rows = response.data.values || [];
@@ -176,7 +182,10 @@ export async function getAllReports() {
       actionsCount: parseInt(row[24]) || 0,
       actions: row[25] ? JSON.parse(row[25]) : [],
       corrector: row[26] || '',
-      inspectorName: row[27] || ''
+      inspectorName: row[27] || '',
+      floorsCount: parseInt(row[28]) || 0,
+      flatsCount: parseInt(row[29]) || 0,
+      additionalNotes: row[30] || ''
     }));
 
     return reports;

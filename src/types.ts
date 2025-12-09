@@ -71,6 +71,11 @@ export interface PropertyReport {
   // Main photos
   mainPhotos: UploadedPhoto[];
 
+  // Building details (optional)
+  floorsCount?: number;
+  flatsCount?: number;
+  additionalNotes?: string;
+
   // Visit info
   visitType: string;
   complaint: string;

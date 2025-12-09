@@ -23,6 +23,9 @@ export default function PropertyReportForm() {
     block: '',
     locationDescription: '',
     locationLink: '',
+    floorsCount: '',
+    flatsCount: '',
+    additionalNotes: '',
     visitType: '',
     complaint: '',
     corrector: '',
@@ -66,6 +69,9 @@ export default function PropertyReportForm() {
         block: '',
         locationDescription: '',
         locationLink: '',
+        floorsCount: '',
+        flatsCount: '',
+        additionalNotes: '',
         visitType: '',
         complaint: '',
         corrector: '',
@@ -202,6 +208,9 @@ export default function PropertyReportForm() {
         locationDescription: formData.locationDescription,
         locationLink: formData.locationLink,
         mainPhotos: uploadedMainPhotos,
+        floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+        flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+        additionalNotes: formData.additionalNotes || undefined,
         visitType: formData.visitType,
         complaint: formData.complaint,
         complaintFiles: uploadedComplaintFiles,
@@ -410,6 +419,46 @@ export default function PropertyReportForm() {
           <div className="section">
             <h3 className="section-title">الصور الرئيسية | Main Photos</h3>
             <PhotoUpload photos={mainPhotos} onPhotosChange={setMainPhotos} />
+          </div>
+
+          {/* Building Details (Optional) */}
+          <div className="section">
+            <h3 className="section-title">تفاصيل المبنى (اختياري) | Building Details (Optional)</h3>
+
+            <div className="field-group">
+              <label htmlFor="floorsCount">عدد الطوابق | No. of Floors</label>
+              <input
+                type="number"
+                id="floorsCount"
+                value={formData.floorsCount}
+                onChange={(e) => handleInputChange('floorsCount', e.target.value)}
+                placeholder="مثال: 5"
+                min="0"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="flatsCount">عدد الشقق | No. of Flats</label>
+              <input
+                type="number"
+                id="flatsCount"
+                value={formData.flatsCount}
+                onChange={(e) => handleInputChange('flatsCount', e.target.value)}
+                placeholder="مثال: 20"
+                min="0"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="additionalNotes">ملاحظات إضافية | Additional Notes</label>
+              <textarea
+                id="additionalNotes"
+                value={formData.additionalNotes}
+                onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
+                placeholder="أي ملاحظات إضافية عن المبنى..."
+                rows={4}
+              />
+            </div>
           </div>
 
           {/* Visit Type and Complaint */}
