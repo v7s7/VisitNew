@@ -1,4 +1,4 @@
-import * as googleAuth from '../config/google-oauth.js';
+import * as googleAuth from '../config/google-hybrid.js';
 import fs from 'fs';
 
 /**

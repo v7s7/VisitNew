@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './routes/index.js';
-import { validateConfig } from './config/google-oauth.js';
+import { validateConfig } from './config/google-hybrid.js';
 
 // Load environment variables
 dotenv.config();
