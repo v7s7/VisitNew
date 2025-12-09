@@ -66,7 +66,7 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
           <div className="selected-property-info">
             <div className="property-name">{selectedProperty.name}</div>
             <div className="property-details">
-              <span className="property-code">كود: {selectedProperty.code}</span>
+              <span className="property-code">مبنى: {selectedProperty.code}</span>
               <span className="property-location">
                 {selectedProperty.area} - {selectedProperty.governorate}
               </span>
@@ -87,8 +87,7 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث بالاسم أو الكود (مثال: 843) | Search by name or code"
-              className="search-input"
+              placeholder="ابحث بالاسم أو المبنى (مثال: 843) | Search by name or building"              className="search-input"
               autoComplete="off"
             />
             {isSearching && <span className="search-loading loading"></span>}
@@ -106,7 +105,7 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
                   className="property-item"
                 >
                   <div className="property-item-name">{property.name}</div>
-                  <div className="property-item-code">كود: {property.code}</div>
+                  <div className="property-item-code">مبنى : {property.code}</div>
                   <div className="property-item-location">
                     {property.area} - {property.block}
                   </div>
