@@ -4,9 +4,13 @@ node_modules/
 # Environment variables
 .env
 
-# Google credentials
+# Google credentials (Service Account - not needed for OAuth)
 google-credentials.json
-*.json
+
+# OAuth tokens (contains user's refresh token)
+oauth-tokens.json
+
+# Don't ignore package.json
 !package.json
 
 # Logs

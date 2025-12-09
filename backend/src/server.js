@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './routes/index.js';
-import { validateConfig } from './config/google.js';
+import { validateConfig } from './config/google-oauth.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,14 +24,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// API routes
-app.use('/api', routes);
+// Mount all routes (includes /auth and /api)
+app.use('/', routes);
 
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'VisitProp Backend API',
-    version: '1.0.0',
+    message: 'VisitProp Backend API (OAuth 2.0)',
+    version: '2.0.0',
+    authentication: '/auth/login',
     documentation: '/api/health'
   });
 });

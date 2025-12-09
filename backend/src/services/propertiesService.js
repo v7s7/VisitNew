@@ -1,4 +1,4 @@
-import { getSheetsClient } from '../config/google.js';
+import { getSheetsClient } from '../config/google-oauth.js';
 
 /**
  * Properties Sheet Structure:

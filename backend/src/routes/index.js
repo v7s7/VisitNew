@@ -3,6 +3,7 @@ import multer from 'multer';
 import * as propertiesController from '../controllers/propertiesController.js';
 import * as uploadController from '../controllers/uploadController.js';
 import * as reportsController from '../controllers/reportsController.js';
+import * as authController from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -29,6 +30,11 @@ router.get('/health', (req, res) => {
     message: 'VisitProp API is running',
     timestamp: new Date().toISOString(),
     endpoints: {
+      auth: {
+        login: 'GET /auth/login (Login page)',
+        status: 'GET /auth/status',
+        logout: 'POST /auth/logout'
+      },
       properties: {
         search: 'GET /api/properties?search=<query>',
         getById: 'GET /api/properties/:id'
@@ -46,6 +52,13 @@ router.get('/health', (req, res) => {
     }
   });
 });
+
+// Authentication routes (OAuth 2.0)
+router.get('/auth/login', authController.loginPage);
+router.get('/auth/google', authController.redirectToGoogle);
+router.get('/auth/callback', authController.handleCallback);
+router.get('/auth/status', authController.checkStatus);
+router.post('/auth/logout', authController.logout);
 
 // Properties routes
 router.get('/properties', propertiesController.searchPropertiesHandler);
