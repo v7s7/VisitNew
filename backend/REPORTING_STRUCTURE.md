@@ -22,7 +22,12 @@ Your Google Sheets workbook should have these tabs:
 
 This is your single source of truth. All other sheets pull data from here.
 
-**Columns A-AE:** (as documented in SHEETS_TEMPLATES.md)
+**Columns A-AF:** (as documented in SHEETS_TEMPLATES.md)
+
+**Key Changes:**
+- Column A: Sequential report IDs (REPORT-001, REPORT-002, etc.)
+- Column B: Submit date only (YYYY-MM-DD)
+- Column C: Submit time only (HH:mm:ss, Bahrain timezone)
 
 ---
 
@@ -56,15 +61,15 @@ This is your single source of truth. All other sheets pull data from here.
 ```
 B2: =COUNTIFS(Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1))
 
-C2: =COUNTIFS(Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1),Reports!$Q:$Q,"routine")
+C2: =COUNTIFS(Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1),Reports!$R:$R,"routine")
 
-D2: =COUNTIFS(Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1),Reports!$Q:$Q,"complaint")
+D2: =COUNTIFS(Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1),Reports!$R:$R,"complaint")
 
-E2: =SUMPRODUCT((TEXT(Reports!$B:$B,"YYYY-MM")=A2)/COUNTIFS(Reports!$D:$D,Reports!$D:$D&"",Reports!$B:$B,Reports!$B:$B))
+E2: =SUMPRODUCT((TEXT(Reports!$B:$B,"YYYY-MM")=A2)/COUNTIFS(Reports!$E:$E,Reports!$E:$E&"",Reports!$B:$B,Reports!$B:$B))
 
-F2: =SUMIFS(Reports!$W:$W,Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1))
+F2: =SUMIFS(Reports!$X:$X,Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1))
 
-G2: =SUMIFS(Reports!$U:$U,Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1))
+G2: =SUMIFS(Reports!$V:$V,Reports!$B:$B,">="&DATE(LEFT(A2,4),RIGHT(A2,2),1),Reports!$B:$B,"<"&DATE(LEFT(A2,4),RIGHT(A2,2)+1,1))
 
 H2: =IF(B2>0,F2/B2,0)
 ```
@@ -103,15 +108,15 @@ H2: =IF(B2>0,F2/B2,0)
 ```
 B2: =COUNTIFS(Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1))
 
-C2: =COUNTIFS(Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1),Reports!$Q:$Q,"routine")
+C2: =COUNTIFS(Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1),Reports!$R:$R,"routine")
 
-D2: =COUNTIFS(Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1),Reports!$Q:$Q,"complaint")
+D2: =COUNTIFS(Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1),Reports!$R:$R,"complaint")
 
-E2: =SUMPRODUCT((YEAR(Reports!$B:$B)=A2)/COUNTIFS(Reports!$D:$D,Reports!$D:$D&"",Reports!$B:$B,Reports!$B:$B))
+E2: =SUMPRODUCT((YEAR(Reports!$B:$B)=A2)/COUNTIFS(Reports!$E:$E,Reports!$E:$E&"",Reports!$B:$B,Reports!$B:$B))
 
-F2: =SUMIFS(Reports!$W:$W,Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1))
+F2: =SUMIFS(Reports!$X:$X,Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1))
 
-G2: =SUMIFS(Reports!$U:$U,Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1))
+G2: =SUMIFS(Reports!$V:$V,Reports!$B:$B,">="&DATE(A2,1,1),Reports!$B:$B,"<"&DATE(A2+1,1,1))
 
 H2: =B2/12
 ```
@@ -125,7 +130,7 @@ H2: =B2/12
 ### Using QUERY Function (Recommended):
 
 ```
-=QUERY(Reports!A:AE, "SELECT D, E, COUNT(A), SUM(W), SUM(U) WHERE A IS NOT NULL GROUP BY D, E ORDER BY COUNT(A) DESC LABEL D 'Property Code', E 'Property Name', COUNT(A) 'Total Visits', SUM(W) 'Total Findings', SUM(U) 'Total Photos'", 1)
+=QUERY(Reports!A:AF, "SELECT E, F, COUNT(A), SUM(X), SUM(V) WHERE A IS NOT NULL GROUP BY E, F ORDER BY COUNT(A) DESC LABEL E 'Property Code', F 'Property Name', COUNT(A) 'Total Visits', SUM(X) 'Total Findings', SUM(V) 'Total Photos'", 1)
 ```
 
 This will automatically generate a table showing:
@@ -189,7 +194,7 @@ Sorted by most visited properties.
 
 **This Month's Routine:**
 ```
-=COUNTIFS(Reports!$B:$B,">="&DATE(YEAR(TODAY()),MONTH(TODAY()),1),Reports!$B:$B,"<"&DATE(YEAR(TODAY()),MONTH(TODAY())+1,1),Reports!$Q:$Q,"routine")
+=COUNTIFS(Reports!$B:$B,">="&DATE(YEAR(TODAY()),MONTH(TODAY()),1),Reports!$B:$B,"<"&DATE(YEAR(TODAY()),MONTH(TODAY())+1,1),Reports!$R:$R,"routine")
 ```
 
 **This Year's Total:**
@@ -199,12 +204,12 @@ Sorted by most visited properties.
 
 **Top 5 Properties (using QUERY):**
 ```
-=QUERY(Reports!D:E, "SELECT D, E, COUNT(D) WHERE D IS NOT NULL GROUP BY D, E ORDER BY COUNT(D) DESC LIMIT 5 LABEL D 'Code', E 'Name', COUNT(D) 'Visits'", 1)
+=QUERY(Reports!E:F, "SELECT E, F, COUNT(E) WHERE E IS NOT NULL GROUP BY E, F ORDER BY COUNT(E) DESC LIMIT 5 LABEL E 'Code', F 'Name', COUNT(E) 'Visits'", 1)
 ```
 
 **Top Complaints:**
 ```
-=QUERY(Reports!D:Q, "SELECT D, E, COUNT(D) WHERE D IS NOT NULL AND Q='complaint' GROUP BY D, E ORDER BY COUNT(D) DESC LIMIT 5 LABEL D 'Code', E 'Name', COUNT(D) 'Complaints'", 1)
+=QUERY(Reports!E:R, "SELECT E, F, COUNT(E) WHERE E IS NOT NULL AND R='complaint' GROUP BY E, F ORDER BY COUNT(E) DESC LIMIT 5 LABEL E 'Code', F 'Name', COUNT(E) 'Complaints'", 1)
 ```
 
 ---

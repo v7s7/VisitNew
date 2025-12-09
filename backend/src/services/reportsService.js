@@ -1,40 +1,74 @@
 import { getSheetsClient } from '../config/google-hybrid.js';
-import { format } from 'date-fns';
+import { format, formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Reports Sheet Structure:
- * Column A: reportId
- * Column B: submittedAt
- * Column C: propertyId
- * Column D: propertyCode
- * Column E: propertyName
- * Column F: waqfType (نوع الوقف)
- * Column G: propertyType (نوع العقار)
- * Column H: endowedTo (موقوف على)
- * Column I: building (مبنى)
- * Column J: unitNumber (رقم الوحدة)
- * Column K: road (طريق / شارع)
- * Column L: area (المنطقة)
- * Column M: governorate (المحافظة)
- * Column N: block (مجمع)
- * Column O: locationDescription
- * Column P: locationLink
- * Column Q: visitType
- * Column R: complaint
- * Column S: complaintFilesCount
- * Column T: complaintFiles (JSON string)
- * Column U: mainPhotosCount
- * Column V: mainPhotosUrls (JSON string)
- * Column W: findingsCount
- * Column X: findings (JSON string)
- * Column Y: actionsCount
- * Column Z: actions (JSON string)
- * Column AA: corrector
- * Column AB: inspectorName
- * Column AC: floorsCount (عدد الطوابق)
- * Column AD: flatsCount (عدد الشقق)
- * Column AE: additionalNotes (ملاحظات إضافية)
+ * Column A: reportId (REPORT-001, REPORT-002, etc.)
+ * Column B: submitDate (YYYY-MM-DD format)
+ * Column C: submitTime (HH:mm:ss format, Bahrain time)
+ * Column D: propertyId
+ * Column E: propertyCode
+ * Column F: propertyName
+ * Column G: waqfType (نوع الوقف)
+ * Column H: propertyType (نوع العقار)
+ * Column I: endowedTo (موقوف على)
+ * Column J: building (مبنى)
+ * Column K: unitNumber (رقم الوحدة)
+ * Column L: road (طريق / شارع)
+ * Column M: area (المنطقة)
+ * Column N: governorate (المحافظة)
+ * Column O: block (مجمع)
+ * Column P: locationDescription
+ * Column Q: locationLink
+ * Column R: visitType
+ * Column S: complaint
+ * Column T: complaintFilesCount
+ * Column U: complaintFiles (JSON string)
+ * Column V: mainPhotosCount
+ * Column W: mainPhotosUrls (JSON string)
+ * Column X: findingsCount
+ * Column Y: findings (JSON string)
+ * Column Z: actionsCount
+ * Column AA: actions (JSON string)
+ * Column AB: corrector
+ * Column AC: inspectorName
+ * Column AD: floorsCount (عدد الطوابق)
+ * Column AE: flatsCount (عدد الشقق)
+ * Column AF: additionalNotes (ملاحظات إضافية)
  */
+
+const BAHRAIN_TIMEZONE = 'Asia/Bahrain';
+
+/**
+ * Get the next sequential report ID
+ */
+async function getNextReportId(sheets, spreadsheetId, sheetName) {
+  try {
+    // Get all report IDs from column A
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A2:A`, // Skip header row
+    });
+
+    const rows = response.data.values || [];
+
+    if (rows.length === 0) {
+      return 'REPORT-001'; // First report
+    }
+
+    // Extract the last report number
+    const lastReportId = rows[rows.length - 1][0] || 'REPORT-000';
+    const lastNumber = parseInt(lastReportId.split('-')[1]) || 0;
+    const nextNumber = lastNumber + 1;
+
+    // Format with leading zeros (e.g., REPORT-001, REPORT-012, REPORT-123)
+    return `REPORT-${String(nextNumber).padStart(3, '0')}`;
+  } catch (error) {
+    console.error('Error getting next report ID:', error);
+    // Fallback to timestamp-based ID if there's an error
+    return `REPORT-${Date.now()}`;
+  }
+}
 
 /**
  * Append a report to Google Sheet
@@ -45,9 +79,13 @@ export async function saveReport(report) {
     const spreadsheetId = process.env.GOOGLE_SHEETS_REPORTS_ID;
     const sheetName = process.env.REPORTS_SHEET_NAME || 'Reports';
 
-    // Generate report ID
-    const reportId = `REPORT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const submittedAt = report.submittedAt || new Date().toISOString();
+    // Generate sequential report ID
+    const reportId = await getNextReportId(sheets, spreadsheetId, sheetName);
+
+    // Get current time in Bahrain timezone
+    const now = new Date();
+    const submitDate = formatInTimeZone(now, BAHRAIN_TIMEZONE, 'yyyy-MM-dd');
+    const submitTime = formatInTimeZone(now, BAHRAIN_TIMEZONE, 'HH:mm:ss');
 
     // Format photos URLs
     const mainPhotosUrls = JSON.stringify(
@@ -79,43 +117,44 @@ export async function saveReport(report) {
 
     // Prepare row data
     const rowData = [
-      reportId,                                    // A: reportId
-      submittedAt,                                 // B: submittedAt
-      report.propertyId || '',                     // C: propertyId
-      report.propertyCode || '',                   // D: propertyCode
-      report.propertyName || '',                   // E: propertyName
-      report.waqfType || '',                       // F: waqfType
-      report.propertyType || '',                   // G: propertyType
-      report.endowedTo || '',                      // H: endowedTo
-      report.building || '',                       // I: building
-      report.unitNumber || '',                     // J: unitNumber
-      report.road || '',                           // K: road
-      report.area || '',                           // L: area
-      report.governorate || '',                    // M: governorate
-      report.block || '',                          // N: block
-      report.locationDescription || '',            // O: locationDescription
-      report.locationLink || '',                   // P: locationLink
-      report.visitType || '',                      // Q: visitType
-      report.complaint || '',                      // R: complaint
-      report.complaintFiles?.length || 0,          // S: complaintFilesCount
-      complaintFiles,                              // T: complaintFiles
-      report.mainPhotos?.length || 0,              // U: mainPhotosCount
-      mainPhotosUrls,                              // V: mainPhotosUrls
-      report.findings?.length || 0,                // W: findingsCount
-      findings,                                    // X: findings
-      report.actions?.length || 0,                 // Y: actionsCount
-      actions,                                     // Z: actions
-      report.corrector || '',                      // AA: corrector
-      report.inspectorName || '',                  // AB: inspectorName
-      report.floorsCount || '',                    // AC: floorsCount
-      report.flatsCount || '',                     // AD: flatsCount
-      report.additionalNotes || ''                 // AE: additionalNotes
+      reportId,                                    // A: reportId (REPORT-001)
+      submitDate,                                  // B: submitDate (YYYY-MM-DD)
+      submitTime,                                  // C: submitTime (HH:mm:ss)
+      report.propertyId || '',                     // D: propertyId
+      report.propertyCode || '',                   // E: propertyCode
+      report.propertyName || '',                   // F: propertyName
+      report.waqfType || '',                       // G: waqfType
+      report.propertyType || '',                   // H: propertyType
+      report.endowedTo || '',                      // I: endowedTo
+      report.building || '',                       // J: building
+      report.unitNumber || '',                     // K: unitNumber
+      report.road || '',                           // L: road
+      report.area || '',                           // M: area
+      report.governorate || '',                    // N: governorate
+      report.block || '',                          // O: block
+      report.locationDescription || '',            // P: locationDescription
+      report.locationLink || '',                   // Q: locationLink
+      report.visitType || '',                      // R: visitType
+      report.complaint || '',                      // S: complaint
+      report.complaintFiles?.length || 0,          // T: complaintFilesCount
+      complaintFiles,                              // U: complaintFiles
+      report.mainPhotos?.length || 0,              // V: mainPhotosCount
+      mainPhotosUrls,                              // W: mainPhotosUrls
+      report.findings?.length || 0,                // X: findingsCount
+      findings,                                    // Y: findings
+      report.actions?.length || 0,                 // Z: actionsCount
+      actions,                                     // AA: actions
+      report.corrector || '',                      // AB: corrector
+      report.inspectorName || '',                  // AC: inspectorName
+      report.floorsCount || '',                    // AD: floorsCount
+      report.flatsCount || '',                     // AE: flatsCount
+      report.additionalNotes || ''                 // AF: additionalNotes
     ];
 
     // Append to sheet
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:AE`,
+      range: `${sheetName}!A:AF`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -149,43 +188,44 @@ export async function getAllReports() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:AE`, // Skip header row
+      range: `${sheetName}!A2:AF`, // Skip header row
     });
 
     const rows = response.data.values || [];
 
     const reports = rows.map(row => ({
       reportId: row[0] || '',
-      submittedAt: row[1] || '',
-      propertyId: row[2] || '',
-      propertyCode: row[3] || '',
-      propertyName: row[4] || '',
-      waqfType: row[5] || '',
-      propertyType: row[6] || '',
-      endowedTo: row[7] || '',
-      building: row[8] || '',
-      unitNumber: row[9] || '',
-      road: row[10] || '',
-      area: row[11] || '',
-      governorate: row[12] || '',
-      block: row[13] || '',
-      locationDescription: row[14] || '',
-      locationLink: row[15] || '',
-      visitType: row[16] || '',
-      complaint: row[17] || '',
-      complaintFilesCount: parseInt(row[18]) || 0,
-      complaintFiles: row[19] ? JSON.parse(row[19]) : [],
-      mainPhotosCount: parseInt(row[20]) || 0,
-      mainPhotosUrls: row[21] ? JSON.parse(row[21]) : [],
-      findingsCount: parseInt(row[22]) || 0,
-      findings: row[23] ? JSON.parse(row[23]) : [],
-      actionsCount: parseInt(row[24]) || 0,
-      actions: row[25] ? JSON.parse(row[25]) : [],
-      corrector: row[26] || '',
-      inspectorName: row[27] || '',
-      floorsCount: parseInt(row[28]) || 0,
-      flatsCount: parseInt(row[29]) || 0,
-      additionalNotes: row[30] || ''
+      submitDate: row[1] || '',
+      submitTime: row[2] || '',
+      propertyId: row[3] || '',
+      propertyCode: row[4] || '',
+      propertyName: row[5] || '',
+      waqfType: row[6] || '',
+      propertyType: row[7] || '',
+      endowedTo: row[8] || '',
+      building: row[9] || '',
+      unitNumber: row[10] || '',
+      road: row[11] || '',
+      area: row[12] || '',
+      governorate: row[13] || '',
+      block: row[14] || '',
+      locationDescription: row[15] || '',
+      locationLink: row[16] || '',
+      visitType: row[17] || '',
+      complaint: row[18] || '',
+      complaintFilesCount: parseInt(row[19]) || 0,
+      complaintFiles: row[20] ? JSON.parse(row[20]) : [],
+      mainPhotosCount: parseInt(row[21]) || 0,
+      mainPhotosUrls: row[22] ? JSON.parse(row[22]) : [],
+      findingsCount: parseInt(row[23]) || 0,
+      findings: row[24] ? JSON.parse(row[24]) : [],
+      actionsCount: parseInt(row[25]) || 0,
+      actions: row[26] ? JSON.parse(row[26]) : [],
+      corrector: row[27] || '',
+      inspectorName: row[28] || '',
+      floorsCount: parseInt(row[29]) || 0,
+      flatsCount: parseInt(row[30]) || 0,
+      additionalNotes: row[31] || ''
     }));
 
     return reports;

@@ -57,42 +57,43 @@ If you have existing data in CSV format:
 
 | Column | Header | Description | Type |
 |--------|--------|-------------|------|
-| A | reportId | Unique report ID (auto-generated) | Text |
-| B | submittedAt | Submission timestamp | DateTime |
-| C | propertyId | Property ID | Text |
-| D | propertyCode | Property code | Text |
-| E | propertyName | Property name | Text |
-| F | waqfType | Waqf type (نوع الوقف) | Text |
-| G | propertyType | Property type (نوع العقار) | Text |
-| H | endowedTo | Endowed to (موقوف على) | Text |
-| I | building | Building (مبنى) | Text |
-| J | unitNumber | Unit number (رقم الوحدة) | Text |
-| K | road | Road/Street (طريق \ شارع) | Text |
-| L | area | Area (المنطقة) | Text |
-| M | governorate | Governorate (المحافظة) | Text |
-| N | block | Complex (مجمع) | Text |
-| O | locationDescription | Location description | Text |
-| P | locationLink | Google Maps link | Text |
-| Q | visitType | Type of visit (routine/complaint) | Text |
-| R | complaint | Complaint details (if visitType=complaint) | Text |
-| S | complaintFilesCount | Number of complaint files | Number |
-| T | complaintFiles | Complaint files (PDFs, images, etc.) | JSON Array |
-| U | mainPhotosCount | Number of main photos | Number |
-| V | mainPhotosUrls | URLs of main photos | JSON Array |
-| W | findingsCount | Number of findings | Number |
-| X | findings | Findings with photos | JSON Array |
-| Y | actionsCount | Number of actions | Number |
-| Z | actions | Actions taken | JSON Array |
-| AA | corrector | Corrector name (optional) | Text |
-| AB | inspectorName | Inspector name (optional) | Text |
-| AC | floorsCount | Number of floors (عدد الطوابق) | Number |
-| AD | flatsCount | Number of flats (عدد الشقق) | Number |
-| AE | additionalNotes | Additional notes (ملاحظات إضافية) | Text |
+| A | reportId | Unique report ID (REPORT-001, REPORT-002, etc.) | Text |
+| B | submitDate | Submission date (YYYY-MM-DD) | Date |
+| C | submitTime | Submission time (HH:mm:ss, Bahrain time) | Time |
+| D | propertyId | Property ID | Text |
+| E | propertyCode | Property code | Text |
+| F | propertyName | Property name | Text |
+| G | waqfType | Waqf type (نوع الوقف) | Text |
+| H | propertyType | Property type (نوع العقار) | Text |
+| I | endowedTo | Endowed to (موقوف على) | Text |
+| J | building | Building (مبنى) | Text |
+| K | unitNumber | Unit number (رقم الوحدة) | Text |
+| L | road | Road/Street (طريق \ شارع) | Text |
+| M | area | Area (المنطقة) | Text |
+| N | governorate | Governorate (المحافظة) | Text |
+| O | block | Complex (مجمع) | Text |
+| P | locationDescription | Location description | Text |
+| Q | locationLink | Google Maps link | Text |
+| R | visitType | Type of visit (routine/complaint) | Text |
+| S | complaint | Complaint details (if visitType=complaint) | Text |
+| T | complaintFilesCount | Number of complaint files | Number |
+| U | complaintFiles | Complaint files (PDFs, images, etc.) | JSON Array |
+| V | mainPhotosCount | Number of main photos | Number |
+| W | mainPhotosUrls | URLs of main photos | JSON Array |
+| X | findingsCount | Number of findings | Number |
+| Y | findings | Findings with photos | JSON Array |
+| Z | actionsCount | Number of actions | Number |
+| AA | actions | Actions taken | JSON Array |
+| AB | corrector | Corrector name (optional) | Text |
+| AC | inspectorName | Inspector name (optional) | Text |
+| AD | floorsCount | Number of floors (عدد الطوابق) | Number |
+| AE | flatsCount | Number of flats (عدد الشقق) | Number |
+| AF | additionalNotes | Additional notes (ملاحظات إضافية) | Text |
 
 ### Example Headers (Copy-Paste):
 
 ```
-reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	complaintFilesCount	complaintFiles	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName	floorsCount	flatsCount	additionalNotes
+reportId	submitDate	submitTime	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	complaintFilesCount	complaintFiles	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName	floorsCount	flatsCount	additionalNotes
 ```
 
 ### Notes:
