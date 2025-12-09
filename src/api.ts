@@ -38,11 +38,20 @@ export async function searchProperties(query: string): Promise<Property[]> {
  * Upload a file to Google Drive
  * POST /api/upload
  */
-export async function uploadFile(file: File, propertyCode: string): Promise<UploadResponse> {
+export async function uploadFile(
+  file: File,
+  propertyCode: string,
+  propertyName: string,
+  subfolder?: string
+): Promise<UploadResponse> {
   try {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('propertyCode', propertyCode);
+    formData.append('propertyName', propertyName);
+    if (subfolder) {
+      formData.append('subfolder', subfolder);
+    }
 
     const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',

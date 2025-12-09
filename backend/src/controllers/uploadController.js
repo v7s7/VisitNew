@@ -13,12 +13,19 @@ export async function uploadFileHandler(req, res) {
       });
     }
 
-    const { propertyCode, subfolder } = req.body;
+    const { propertyCode, propertyName, subfolder } = req.body;
 
     if (!propertyCode) {
       return res.status(400).json({
         error: 'Property code required',
         message: 'Please provide propertyCode in the request'
+      });
+    }
+
+    if (!propertyName) {
+      return res.status(400).json({
+        error: 'Property name required',
+        message: 'Please provide propertyName in the request'
       });
     }
 
@@ -30,11 +37,12 @@ export async function uploadFileHandler(req, res) {
       file.originalname,
       file.mimetype,
       propertyCode,
-      subfolder || 'main'
+      propertyName,
+      subfolder || 'الصور الرئيسية'
     );
 
     console.log(`📤 Uploaded: ${file.originalname} → ${result.fileName}`);
-    console.log(`   Property: ${propertyCode} | Subfolder: ${subfolder || 'main'}`);
+    console.log(`   Property: ${propertyCode} - ${propertyName} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
 
     res.json({
       success: true,
@@ -64,7 +72,7 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
-    const { propertyCode, subfolder } = req.body;
+    const { propertyCode, propertyName, subfolder } = req.body;
 
     if (!propertyCode) {
       return res.status(400).json({
@@ -73,14 +81,22 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
+    if (!propertyName) {
+      return res.status(400).json({
+        error: 'Property name required',
+        message: 'Please provide propertyName in the request'
+      });
+    }
+
     // Upload all files
     const results = await driveService.uploadMultipleFiles(
       req.files,
       propertyCode,
-      subfolder || 'main'
+      propertyName,
+      subfolder || 'الصور الرئيسية'
     );
 
-    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode}`);
+    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} - ${propertyName}`);
 
     res.json({
       success: true,

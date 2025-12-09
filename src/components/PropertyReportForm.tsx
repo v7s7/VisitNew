@@ -139,7 +139,7 @@ export default function PropertyReportForm() {
       // Upload all photos first
       const uploadMainPhotos = async () => {
         const uploadPromises = mainPhotos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code)
+          uploadFile(photo.file, selectedProperty.code, selectedProperty.name, 'الصور الرئيسية')
         );
         const results = await Promise.all(uploadPromises);
         return mainPhotos.map((photo, index) => ({
@@ -148,10 +148,16 @@ export default function PropertyReportForm() {
         }));
       };
 
-      const uploadFindingPhotos = async (finding: Finding) => {
+      const uploadFindingPhotos = async (finding: Finding, findingIndex: number) => {
         if (finding.photos.length === 0) return finding;
+
+        // Create folder name: "Finding1 - [description]"
+        const findingNumber = findingIndex + 1;
+        const findingDescription = finding.text.substring(0, 50); // Limit to 50 chars
+        const findingFolderName = `Finding${findingNumber} - ${findingDescription}`;
+
         const uploadPromises = finding.photos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code)
+          uploadFile(photo.file, selectedProperty.code, selectedProperty.name, findingFolderName)
         );
         const results = await Promise.all(uploadPromises);
         return {
@@ -166,7 +172,7 @@ export default function PropertyReportForm() {
       const uploadComplaintFiles = async () => {
         if (complaintFiles.length === 0) return [];
         const uploadPromises = complaintFiles.map((file) =>
-          uploadFile(file.file, selectedProperty.code)
+          uploadFile(file.file, selectedProperty.code, selectedProperty.name, 'ملفات البلاغ')
         );
         const results = await Promise.all(uploadPromises);
         return complaintFiles.map((file, index) => ({
@@ -177,7 +183,7 @@ export default function PropertyReportForm() {
 
       const uploadedMainPhotos = await uploadMainPhotos();
       const uploadedComplaintFiles = await uploadComplaintFiles();
-      const uploadedFindings = await Promise.all(findings.map(uploadFindingPhotos));
+      const uploadedFindings = await Promise.all(findings.map((finding, index) => uploadFindingPhotos(finding, index)));
 
       // Prepare report data
       const report: PropertyReport = {

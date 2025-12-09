@@ -112,30 +112,40 @@ The backend automatically creates this structure:
 
 ```
 VisitProp Uploads/  (your main folder)
-├── 843/                      (property code)
-│   └── 2024-01-15/           (date)
-│       ├── main/             (main photos)
-│       │   ├── 1705320000_photo1.jpg
-│       │   └── 1705320001_photo2.jpg
-│       └── findings/         (finding photos)
-│           ├── 1705320002_finding1_photo1.jpg
-│           └── 1705320003_finding1_photo2.jpg
-├── 844/
+├── 843 - عقار النخيل السكني/           (code - name)
+│   └── 2024-01-15/                      (date)
+│       ├── الصور الرئيسية/              (main photos)
+│       │   ├── photo1.jpg
+│       │   └── photo2.jpg
+│       ├── Finding1 - تسرب في السقف/    (finding 1 description)
+│       │   ├── image1.jpg
+│       │   └── image2.jpg
+│       ├── Finding2 - شرخ في الجدار/    (finding 2 description)
+│       │   └── image1.jpg
+│       └── ملفات البلاغ/                (complaint files)
+│           ├── document.pdf
+│           └── report.docx
+├── 844 - عقار الورود التجاري/
 │   └── 2024-01-15/
-│       └── main/
-│           └── 1705320004_photo1.jpg
+│       └── الصور الرئيسية/
+│           └── photo1.jpg
 ```
 
 ### Folder Organization Rules:
 
-1. **Property Code** - One folder per property
-2. **Date** - One folder per day (YYYY-MM-DD format)
-3. **Subfolder** - `main/` for main photos, `findings/` for finding photos
-4. **Filename** - Timestamp + original filename for uniqueness
+1. **Property Folder** - Named as `[Code] - [Property Name]` (e.g., "843 - عقار النخيل السكني")
+2. **Date Folder** - One folder per day in YYYY-MM-DD format
+3. **Main Photos** - Stored in "الصور الرئيسية" folder
+4. **Finding Photos** - Each finding gets its own folder: "Finding[N] - [description]"
+   - Description is limited to first 50 characters of the finding text
+5. **Complaint Files** - Stored in "ملفات البلاغ" folder (PDFs, documents, etc.)
+6. **Filenames** - Use original filenames (Arabic characters supported)
 
 This structure makes it easy to:
-- Find all photos for a specific property
-- Find all photos from a specific date
+- Find all files for a specific property by name and code
+- Find all files from a specific date
+- See findings organized by description
+- Distinguish between main photos, findings, and complaint documents
 - Archive old data by property or date
 
 ---

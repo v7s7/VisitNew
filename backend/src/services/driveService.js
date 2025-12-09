@@ -6,14 +6,16 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── Property Code (e.g., "843")
- *     └── Date (e.g., "2024-01-15")
- *         ├── main/
+ * └── "843 - عقار النخيل السكني" (Code + Name)
+ *     └── "2024-01-15" (Date)
+ *         ├── الصور الرئيسية/ (Main Photos)
  *         │   ├── photo1.jpg
  *         │   └── photo2.jpg
- *         └── findings/
- *             ├── finding1_photo1.jpg
- *             └── finding1_photo2.jpg
+ *         ├── Finding1 - [finding description]/
+ *         │   ├── photo1.jpg
+ *         │   └── photo2.jpg
+ *         └── Finding2 - [finding description]/
+ *             └── photo1.jpg
  */
 
 /**
@@ -52,20 +54,29 @@ async function getOrCreateFolder(parentFolderId, folderName) {
 }
 
 /**
- * Get organized folder path for uploads
- * Creates: MainFolder/PropertyCode/Date/subfolder
+ * Sanitize folder name to be safe for Google Drive
  */
-async function getOrganizedFolderPath(propertyCode, subfolder = 'main') {
+function sanitizeFolderName(name) {
+  // Remove or replace characters that might cause issues
+  return name.replace(/[/<>:"|?*\\]/g, '-').trim();
+}
+
+/**
+ * Get organized folder path for uploads
+ * Creates: MainFolder/[Code - Name]/Date/subfolder
+ */
+async function getOrganizedFolderPath(propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Create: MainFolder/PropertyCode
-  const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyCode);
+  // Create: MainFolder/[Code - Name]
+  const propertyFolderName = sanitizeFolderName(`${propertyCode} - ${propertyName}`);
+  const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/PropertyCode/Date
+  // Create: MainFolder/[Code - Name]/Date
   const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
 
-  // Create: MainFolder/PropertyCode/Date/subfolder
+  // Create: MainFolder/[Code - Name]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
 
   return subFolderId;
@@ -77,26 +88,25 @@ async function getOrganizedFolderPath(propertyCode, subfolder = 'main') {
  * @param {string} fileName - File name
  * @param {string} mimeType - MIME type
  * @param {string} propertyCode - Property code for organization
- * @param {string} subfolder - Subfolder name (e.g., 'main', 'findings')
+ * @param {string} propertyName - Property name for organization
+ * @param {string} subfolder - Subfolder name (e.g., 'الصور الرئيسية', 'Finding1 - description')
  */
-export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, subfolder = 'main') {
+export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
   try {
     const drive = await getDriveClient();
 
     // Get organized folder path
-    const folderId = await getOrganizedFolderPath(propertyCode, subfolder);
+    const folderId = await getOrganizedFolderPath(propertyCode, propertyName, subfolder);
 
     // Create readable stream from buffer
     const bufferStream = Readable.from(fileBuffer);
 
-    // Sanitize filename
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const timestamp = Date.now();
-    const finalFileName = `${timestamp}_${sanitizedFileName}`;
+    // Use original filename (no timestamp prefix for cleaner names)
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._\u0600-\u06FF\s-]/g, '_');
 
     // Upload file
     const fileMetadata = {
-      name: finalFileName,
+      name: sanitizedFileName,
       parents: [folderId]
     };
 
@@ -126,7 +136,7 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, s
 
     return {
       fileId: response.data.id,
-      fileName: finalFileName,
+      fileName: sanitizedFileName,
       url: response.data.webViewLink || `https://drive.google.com/file/d/${response.data.id}/view`,
       downloadUrl: response.data.webContentLink
     };
@@ -139,9 +149,9 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, s
 /**
  * Upload multiple files
  */
-export async function uploadMultipleFiles(files, propertyCode, subfolder = 'main') {
+export async function uploadMultipleFiles(files, propertyCode, propertyName, subfolder = 'الصور الرئيسية') {
   const uploadPromises = files.map(file =>
-    uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, subfolder)
+    uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyName, subfolder)
   );
 
   return await Promise.all(uploadPromises);
