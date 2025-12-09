@@ -3,10 +3,15 @@ export interface Property {
   id: string;
   code: string;
   name: string;
-  road: string;
-  block: string;
-  area: string;
-  governorate: string;
+  waqfType: string;        // نوع الوقف
+  propertyType: string;    // نوع العقار
+  endowedTo: string;       // موقوف على
+  building: string;        // مبنى
+  unitNumber: string;      // رقم الوحدة
+  road: string;            // طريق \ شارع
+  area: string;            // المنطقة
+  governorate: string;     // المحافظة
+  block: string;           // مجمع
   defaultLocationLink?: string;
 }
 
@@ -38,11 +43,16 @@ export interface PropertyReport {
   propertyCode: string;
   propertyName: string;
 
-  // Editable address fields
-  road: string;
-  area: string;
-  governorate: string;
-  block: string;
+  // Editable property fields (from database)
+  waqfType: string;        // نوع الوقف
+  propertyType: string;    // نوع العقار
+  endowedTo: string;       // موقوف على
+  building: string;        // مبنى
+  unitNumber: string;      // رقم الوحدة
+  road: string;            // طريق \ شارع
+  area: string;            // المنطقة
+  governorate: string;     // المحافظة
+  block: string;           // مجمع
 
   // Location
   locationDescription: string;

@@ -15,21 +15,28 @@ Quick reference for setting up your Google Sheets.
 | A | id | Unique property ID | 1, 2, 3... |
 | B | code | Property code used by inspectors | 843, 844, 100 |
 | C | name | Property name (Arabic/English) | عقار النخيل السكني |
-| D | road | Road/Street name | طريق الملك فهد |
-| E | block | Block/Complex name | مجمع أ |
-| F | area | Area name | المنامة |
-| G | governorate | Governorate name | محافظة العاصمة |
-| H | defaultLocationLink | Google Maps link (optional) | https://maps.google.com/?q=26.2285,50.5860 |
+| D | waqfType | Waqf type (نوع الوقف) | وقف خيري |
+| E | propertyType | Property type (نوع العقار) | سكني |
+| F | endowedTo | Endowed to (موقوف على) | الفقراء والمساكين |
+| G | building | Building (مبنى) | برج أ |
+| H | unitNumber | Unit number (رقم الوحدة) | 101 |
+| I | road | Road/Street (طريق \ شارع) | طريق الملك فهد |
+| J | area | Area (المنطقة) | المنامة |
+| K | governorate | Governorate (المحافظة) | محافظة العاصمة |
+| L | block | Complex (مجمع) | مجمع أ |
+| M | defaultLocationLink | Google Maps link (optional) | https://maps.google.com/?q=26.2285,50.5860 |
 
 ### Example Data:
 
 ```
-A       B       C                           D                   E           F           G                   H
-id      code    name                        road                block       area        governorate         defaultLocationLink
-1       843     عقار النخيل السكني          طريق الملك فهد      مجمع أ      المنامة     محافظة العاصمة      https://maps.google.com/?q=26.2285,50.5860
-2       844     عقار الورود التجاري        شارع البديع          مجمع ب      المحرق      محافظة المحرق       https://maps.google.com/?q=26.2540,50.6130
-3       100     برج المستقبل                طريق الشيخ عيسى    مجمع ج      الرفاع      محافظة الجنوبية     https://maps.google.com/?q=26.1296,50.5550
+A    B    C                      D           E       F                    G      H    I                J        K                L        M
+id   code name                   waqfType    type    endowedTo            bldg   unit road             area     governorate      block    defaultLocationLink
+1    843  عقار النخيل السكني    وقف خيري   سكني    الفقراء والمساكين   برج أ  101  طريق الملك فهد   المنامة  محافظة العاصمة   مجمع أ   https://maps.google.com/?q=26.2285,50.5860
+2    844  عقار الورود التجاري  وقف ذري    تجاري  أهل الواقف          برج ب  202  شارع البديع       المحرق   محافظة المحرق    مجمع ب   https://maps.google.com/?q=26.2540,50.6130
+3    100  برج المستقبل          وقف خيري   مكتبي  المساجد             برج ج  303  طريق الشيخ عيسى الرفاع   محافظة الجنوبية  مجمع ج   https://maps.google.com/?q=26.1296,50.5550
 ```
+
+**Note:** Columns D-L can be left empty if data is not available. The frontend will auto-fill these fields from the database when a property is selected, and users can edit them before submitting.
 
 ### Bulk Import from CSV
 
@@ -55,32 +62,38 @@ If you have existing data in CSV format:
 | C | propertyId | Property ID | Text |
 | D | propertyCode | Property code | Text |
 | E | propertyName | Property name | Text |
-| F | road | Road/Street | Text |
-| G | area | Area | Text |
-| H | governorate | Governorate | Text |
-| I | block | Block | Text |
-| J | locationDescription | Location description | Text |
-| K | locationLink | Google Maps link | Text |
-| L | visitType | Type of visit | Text |
-| M | complaint | Complaint details | Text |
-| N | mainPhotosCount | Number of main photos | Number |
-| O | mainPhotosUrls | URLs of main photos | JSON Array |
-| P | findingsCount | Number of findings | Number |
-| Q | findings | Findings with photos | JSON Array |
-| R | actionsCount | Number of actions | Number |
-| S | actions | Actions taken | JSON Array |
-| T | corrector | Corrector name (optional) | Text |
-| U | inspectorName | Inspector name (optional) | Text |
+| F | waqfType | Waqf type (نوع الوقف) | Text |
+| G | propertyType | Property type (نوع العقار) | Text |
+| H | endowedTo | Endowed to (موقوف على) | Text |
+| I | building | Building (مبنى) | Text |
+| J | unitNumber | Unit number (رقم الوحدة) | Text |
+| K | road | Road/Street (طريق \ شارع) | Text |
+| L | area | Area (المنطقة) | Text |
+| M | governorate | Governorate (المحافظة) | Text |
+| N | block | Complex (مجمع) | Text |
+| O | locationDescription | Location description | Text |
+| P | locationLink | Google Maps link | Text |
+| Q | visitType | Type of visit | Text |
+| R | complaint | Complaint details | Text |
+| S | mainPhotosCount | Number of main photos | Number |
+| T | mainPhotosUrls | URLs of main photos | JSON Array |
+| U | findingsCount | Number of findings | Number |
+| V | findings | Findings with photos | JSON Array |
+| W | actionsCount | Number of actions | Number |
+| X | actions | Actions taken | JSON Array |
+| Y | corrector | Corrector name (optional) | Text |
+| Z | inspectorName | Inspector name (optional) | Text |
 
 ### Example Headers (Copy-Paste):
 
 ```
-reportId	submittedAt	propertyId	propertyCode	propertyName	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName
+reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName
 ```
 
 ### Notes:
 
-- **Columns O, Q, S** contain JSON data (arrays)
+- **Columns T, V, X** contain JSON data (arrays)
+- **Columns F-N** store property details that can be edited during report submission
 - Data is automatically added by the backend when reports are submitted
 - You can add formulas in additional columns for analysis
 - Don't delete or rename these columns - the backend depends on them
@@ -177,10 +190,15 @@ SELECT
   id,
   code,
   name,
+  waqf_type,
+  property_type,
+  endowed_to,
+  building,
+  unit_number,
   road,
-  block,
   area,
   governorate,
+  block,
   default_location_link
 FROM properties
 ```

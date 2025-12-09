@@ -11,6 +11,11 @@ import './PropertyReportForm.css';
 export default function PropertyReportForm() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
+    waqfType: '',
+    propertyType: '',
+    endowedTo: '',
+    building: '',
+    unitNumber: '',
     road: '',
     area: '',
     governorate: '',
@@ -28,12 +33,17 @@ export default function PropertyReportForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Auto-fill address fields when property is selected
+  // Auto-fill fields when property is selected
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
     if (property) {
       setFormData({
         ...formData,
+        waqfType: property.waqfType || '',
+        propertyType: property.propertyType || '',
+        endowedTo: property.endowedTo || '',
+        building: property.building || '',
+        unitNumber: property.unitNumber || '',
         road: property.road || '',
         area: property.area || '',
         governorate: property.governorate || '',
@@ -43,6 +53,11 @@ export default function PropertyReportForm() {
     } else {
       // Reset form when property is deselected
       setFormData({
+        waqfType: '',
+        propertyType: '',
+        endowedTo: '',
+        building: '',
+        unitNumber: '',
         road: '',
         area: '',
         governorate: '',
@@ -152,6 +167,11 @@ export default function PropertyReportForm() {
         propertyId: selectedProperty.id,
         propertyCode: selectedProperty.code,
         propertyName: selectedProperty.name,
+        waqfType: formData.waqfType,
+        propertyType: formData.propertyType,
+        endowedTo: formData.endowedTo,
+        building: formData.building,
+        unitNumber: formData.unitNumber,
         road: formData.road,
         area: formData.area,
         governorate: formData.governorate,
@@ -229,11 +249,66 @@ export default function PropertyReportForm() {
         </div>
       )}
 
-      {/* Address Fields (Editable) */}
+      {/* Property Details (Editable) */}
       {selectedProperty && (
         <>
           <div className="section">
-            <h3 className="section-title">عنوان العقار | Property Address</h3>
+            <h3 className="section-title">بيانات العقار | Property Details</h3>
+
+            <div className="field-group">
+              <label htmlFor="waqfType">نوع الوقف | Waqf Type</label>
+              <input
+                type="text"
+                id="waqfType"
+                value={formData.waqfType}
+                onChange={(e) => handleInputChange('waqfType', e.target.value)}
+                placeholder="أدخل نوع الوقف"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="propertyType">نوع العقار | Property Type</label>
+              <input
+                type="text"
+                id="propertyType"
+                value={formData.propertyType}
+                onChange={(e) => handleInputChange('propertyType', e.target.value)}
+                placeholder="أدخل نوع العقار"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="endowedTo">موقوف على | Endowed To</label>
+              <input
+                type="text"
+                id="endowedTo"
+                value={formData.endowedTo}
+                onChange={(e) => handleInputChange('endowedTo', e.target.value)}
+                placeholder="أدخل موقوف على"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="building">مبنى | Building</label>
+              <input
+                type="text"
+                id="building"
+                value={formData.building}
+                onChange={(e) => handleInputChange('building', e.target.value)}
+                placeholder="أدخل المبنى"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="unitNumber">رقم الوحدة | Unit Number</label>
+              <input
+                type="text"
+                id="unitNumber"
+                value={formData.unitNumber}
+                onChange={(e) => handleInputChange('unitNumber', e.target.value)}
+                placeholder="أدخل رقم الوحدة"
+              />
+            </div>
 
             <div className="field-group">
               <label htmlFor="road">طريق / شارع | Road / Street</label>
@@ -269,7 +344,7 @@ export default function PropertyReportForm() {
             </div>
 
             <div className="field-group">
-              <label htmlFor="block">مجمع | Block</label>
+              <label htmlFor="block">مجمع | Complex</label>
               <input
                 type="text"
                 id="block"

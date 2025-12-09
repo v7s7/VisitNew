@@ -5,11 +5,16 @@ import { getSheetsClient } from '../config/google-hybrid.js';
  * Column A: id
  * Column B: code
  * Column C: name
- * Column D: road
- * Column E: block
- * Column F: area
- * Column G: governorate
- * Column H: defaultLocationLink
+ * Column D: نوع الوقف (waqfType)
+ * Column E: نوع العقار (propertyType)
+ * Column F: موقوف على (endowedTo)
+ * Column G: مبنى (building)
+ * Column H: رقم الوحدة (unitNumber)
+ * Column I: طريق \ شارع (road)
+ * Column J: المنطقة (area)
+ * Column K: المحافظة (governorate)
+ * Column L: مجمع (block)
+ * Column M: defaultLocationLink
  */
 
 /**
@@ -23,7 +28,7 @@ export async function getAllProperties() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:H`, // Skip header row
+      range: `${sheetName}!A2:M`, // Skip header row
     });
 
     const rows = response.data.values || [];
@@ -32,11 +37,16 @@ export async function getAllProperties() {
       id: row[0] || '',
       code: row[1] || '',
       name: row[2] || '',
-      road: row[3] || '',
-      block: row[4] || '',
-      area: row[5] || '',
-      governorate: row[6] || '',
-      defaultLocationLink: row[7] || ''
+      waqfType: row[3] || '',         // نوع الوقف
+      propertyType: row[4] || '',     // نوع العقار
+      endowedTo: row[5] || '',        // موقوف على
+      building: row[6] || '',         // مبنى
+      unitNumber: row[7] || '',       // رقم الوحدة
+      road: row[8] || '',             // طريق \ شارع
+      area: row[9] || '',             // المنطقة
+      governorate: row[10] || '',     // المحافظة
+      block: row[11] || '',           // مجمع
+      defaultLocationLink: row[12] || ''
     }));
 
     return properties;

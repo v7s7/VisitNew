@@ -8,22 +8,27 @@ import { format } from 'date-fns';
  * Column C: propertyId
  * Column D: propertyCode
  * Column E: propertyName
- * Column F: road
- * Column G: area
- * Column H: governorate
- * Column I: block
- * Column J: locationDescription
- * Column K: locationLink
- * Column L: visitType
- * Column M: complaint
- * Column N: mainPhotosCount
- * Column O: mainPhotosUrls (JSON string)
- * Column P: findingsCount
- * Column Q: findings (JSON string)
- * Column R: actionsCount
- * Column S: actions (JSON string)
- * Column T: corrector
- * Column U: inspectorName
+ * Column F: waqfType (نوع الوقف)
+ * Column G: propertyType (نوع العقار)
+ * Column H: endowedTo (موقوف على)
+ * Column I: building (مبنى)
+ * Column J: unitNumber (رقم الوحدة)
+ * Column K: road (طريق / شارع)
+ * Column L: area (المنطقة)
+ * Column M: governorate (المحافظة)
+ * Column N: block (مجمع)
+ * Column O: locationDescription
+ * Column P: locationLink
+ * Column Q: visitType
+ * Column R: complaint
+ * Column S: mainPhotosCount
+ * Column T: mainPhotosUrls (JSON string)
+ * Column U: findingsCount
+ * Column V: findings (JSON string)
+ * Column W: actionsCount
+ * Column X: actions (JSON string)
+ * Column Y: corrector
+ * Column Z: inspectorName
  */
 
 /**
@@ -64,28 +69,33 @@ export async function saveReport(report) {
       report.propertyId || '',                     // C: propertyId
       report.propertyCode || '',                   // D: propertyCode
       report.propertyName || '',                   // E: propertyName
-      report.road || '',                           // F: road
-      report.area || '',                           // G: area
-      report.governorate || '',                    // H: governorate
-      report.block || '',                          // I: block
-      report.locationDescription || '',            // J: locationDescription
-      report.locationLink || '',                   // K: locationLink
-      report.visitType || '',                      // L: visitType
-      report.complaint || '',                      // M: complaint
-      report.mainPhotos?.length || 0,              // N: mainPhotosCount
-      mainPhotosUrls,                              // O: mainPhotosUrls
-      report.findings?.length || 0,                // P: findingsCount
-      findings,                                    // Q: findings
-      report.actions?.length || 0,                 // R: actionsCount
-      actions,                                     // S: actions
-      report.corrector || '',                      // T: corrector
-      report.inspectorName || ''                   // U: inspectorName
+      report.waqfType || '',                       // F: waqfType
+      report.propertyType || '',                   // G: propertyType
+      report.endowedTo || '',                      // H: endowedTo
+      report.building || '',                       // I: building
+      report.unitNumber || '',                     // J: unitNumber
+      report.road || '',                           // K: road
+      report.area || '',                           // L: area
+      report.governorate || '',                    // M: governorate
+      report.block || '',                          // N: block
+      report.locationDescription || '',            // O: locationDescription
+      report.locationLink || '',                   // P: locationLink
+      report.visitType || '',                      // Q: visitType
+      report.complaint || '',                      // R: complaint
+      report.mainPhotos?.length || 0,              // S: mainPhotosCount
+      mainPhotosUrls,                              // T: mainPhotosUrls
+      report.findings?.length || 0,                // U: findingsCount
+      findings,                                    // V: findings
+      report.actions?.length || 0,                 // W: actionsCount
+      actions,                                     // X: actions
+      report.corrector || '',                      // Y: corrector
+      report.inspectorName || ''                   // Z: inspectorName
     ];
 
     // Append to sheet
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:U`,
+      range: `${sheetName}!A:Z`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -119,7 +129,7 @@ export async function getAllReports() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:U`, // Skip header row
+      range: `${sheetName}!A2:Z`, // Skip header row
     });
 
     const rows = response.data.values || [];
@@ -130,22 +140,27 @@ export async function getAllReports() {
       propertyId: row[2] || '',
       propertyCode: row[3] || '',
       propertyName: row[4] || '',
-      road: row[5] || '',
-      area: row[6] || '',
-      governorate: row[7] || '',
-      block: row[8] || '',
-      locationDescription: row[9] || '',
-      locationLink: row[10] || '',
-      visitType: row[11] || '',
-      complaint: row[12] || '',
-      mainPhotosCount: parseInt(row[13]) || 0,
-      mainPhotosUrls: row[14] ? JSON.parse(row[14]) : [],
-      findingsCount: parseInt(row[15]) || 0,
-      findings: row[16] ? JSON.parse(row[16]) : [],
-      actionsCount: parseInt(row[17]) || 0,
-      actions: row[18] ? JSON.parse(row[18]) : [],
-      corrector: row[19] || '',
-      inspectorName: row[20] || ''
+      waqfType: row[5] || '',
+      propertyType: row[6] || '',
+      endowedTo: row[7] || '',
+      building: row[8] || '',
+      unitNumber: row[9] || '',
+      road: row[10] || '',
+      area: row[11] || '',
+      governorate: row[12] || '',
+      block: row[13] || '',
+      locationDescription: row[14] || '',
+      locationLink: row[15] || '',
+      visitType: row[16] || '',
+      complaint: row[17] || '',
+      mainPhotosCount: parseInt(row[18]) || 0,
+      mainPhotosUrls: row[19] ? JSON.parse(row[19]) : [],
+      findingsCount: parseInt(row[20]) || 0,
+      findings: row[21] ? JSON.parse(row[21]) : [],
+      actionsCount: parseInt(row[22]) || 0,
+      actions: row[23] ? JSON.parse(row[23]) : [],
+      corrector: row[24] || '',
+      inspectorName: row[25] || ''
     }));
 
     return reports;
