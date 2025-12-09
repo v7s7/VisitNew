@@ -23,8 +23,8 @@ const upload = multer({
   }
 });
 
-// Health check
-router.get('/health', (req, res) => {
+// API Health check
+router.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'VisitProp API is running',
@@ -53,24 +53,25 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Authentication routes (OAuth 2.0)
+// Authentication routes (OAuth 2.0) - mounted at /auth
 router.get('/auth/login', authController.loginPage);
 router.get('/auth/google', authController.redirectToGoogle);
 router.get('/auth/callback', authController.handleCallback);
 router.get('/auth/status', authController.checkStatus);
 router.post('/auth/logout', authController.logout);
 
+// API routes - mounted at /api
 // Properties routes
-router.get('/properties', propertiesController.searchPropertiesHandler);
-router.get('/properties/:id', propertiesController.getPropertyHandler);
+router.get('/api/properties', propertiesController.searchPropertiesHandler);
+router.get('/api/properties/:id', propertiesController.getPropertyHandler);
 
 // Upload routes
-router.post('/upload', upload.single('file'), uploadController.uploadFileHandler);
-router.post('/upload/multiple', upload.array('files', 10), uploadController.uploadMultipleFilesHandler);
+router.post('/api/upload', upload.single('file'), uploadController.uploadFileHandler);
+router.post('/api/upload/multiple', upload.array('files', 10), uploadController.uploadMultipleFilesHandler);
 
 // Reports routes
-router.post('/reports', reportsController.submitReportHandler);
-router.get('/reports', reportsController.getReportsHandler);
-router.get('/reports/:id', reportsController.getReportHandler);
+router.post('/api/reports', reportsController.submitReportHandler);
+router.get('/api/reports', reportsController.getReportsHandler);
+router.get('/api/reports/:id', reportsController.getReportHandler);
 
 export default router;
