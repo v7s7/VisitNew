@@ -15,6 +15,14 @@ export async function uploadFileHandler(req, res) {
 
     const { propertyCode, propertyName, subfolder } = req.body;
 
+    console.log('📥 Upload request received:', {
+      file: req.file?.originalname,
+      propertyCode,
+      propertyName,
+      subfolder,
+      bodyKeys: Object.keys(req.body)
+    });
+
     if (!propertyCode) {
       return res.status(400).json({
         error: 'Property code required',
@@ -25,7 +33,7 @@ export async function uploadFileHandler(req, res) {
     if (!propertyName) {
       return res.status(400).json({
         error: 'Property name required',
-        message: 'Please provide propertyName in the request'
+        message: `Please provide propertyName in the request. Received: ${JSON.stringify(req.body)}`
       });
     }
 

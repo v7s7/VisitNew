@@ -45,6 +45,14 @@ export async function uploadFile(
   subfolder?: string
 ): Promise<UploadResponse> {
   try {
+    // Validate required parameters
+    if (!propertyCode) {
+      throw new Error('Property code is required for upload');
+    }
+    if (!propertyName) {
+      throw new Error('Property name is required for upload');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('propertyCode', propertyCode);
@@ -53,13 +61,21 @@ export async function uploadFile(
       formData.append('subfolder', subfolder);
     }
 
+    console.log('📤 Uploading file:', {
+      fileName: file.name,
+      propertyCode,
+      propertyName,
+      subfolder,
+    });
+
     const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(`Upload failed: ${errorData.message || response.statusText}`);
     }
 
     const data: UploadResponse = await response.json();
