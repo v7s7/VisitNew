@@ -1,5 +1,5 @@
 import { getSheetsClient } from '../config/google-hybrid.js';
-import { format, formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Reports Sheet Structure:
