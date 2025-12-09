@@ -178,7 +178,10 @@ After migration, verify your sheets:
 - [ ] Columns A-E: Basic info (reportId → propertyName)
 - [ ] Columns F-J: Property details (waqfType → unitNumber)
 - [ ] Columns K-N: Location (road → block)
-- [ ] Columns O-Z: Report details (locationDescription → inspectorName)
+- [ ] Columns O-P: Location details (locationDescription, locationLink)
+- [ ] Columns Q-R: Visit info (visitType, complaint)
+- [ ] Columns S-T: Complaint files (complaintFilesCount, complaintFiles)
+- [ ] Columns U-AB: Photos, findings, actions, corrector, inspector
 
 ---
 

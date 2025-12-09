@@ -36,6 +36,16 @@ export interface Action {
   text: string;
 }
 
+// Complaint file (PDF, images, documents)
+export interface ComplaintFile {
+  localId: string;
+  file: File;
+  uploadedUrl?: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 // Complete report form data
 export interface PropertyReport {
   // Property info
@@ -64,6 +74,7 @@ export interface PropertyReport {
   // Visit info
   visitType: string;
   complaint: string;
+  complaintFiles: ComplaintFile[];
 
   // Findings & Actions
   findings: Finding[];

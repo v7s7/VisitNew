@@ -1,0 +1,181 @@
+.complaint-file-upload {
+  width: 100%;
+}
+
+.upload-area {
+  margin-bottom: 16px;
+}
+
+.upload-label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-label:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.upload-label:active {
+  transform: scale(0.98);
+}
+
+.upload-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.upload-text {
+  flex: 1;
+  text-align: left;
+}
+
+[dir="rtl"] .upload-text {
+  text-align: right;
+}
+
+.upload-text-primary {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.upload-text-secondary {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.file-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.file-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.remove-file-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #fee;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.remove-file-btn:hover {
+  background: #fecaca;
+  border-color: #dc2626;
+}
+
+.remove-file-btn:active {
+  transform: scale(0.95);
+}
+
+.file-count {
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #475569;
+  text-align: center;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .upload-label {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .upload-icon {
+    font-size: 28px;
+  }
+
+  .upload-text-primary {
+    font-size: 15px;
+  }
+
+  .upload-text-secondary {
+    font-size: 13px;
+  }
+
+  .file-item {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .file-icon {
+    font-size: 24px;
+  }
+
+  .file-name {
+    font-size: 13px;
+  }
+
+  .file-meta {
+    font-size: 11px;
+  }
+
+  .remove-file-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+}

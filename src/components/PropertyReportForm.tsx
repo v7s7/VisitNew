@@ -1,9 +1,10 @@
 import { useState, FormEvent } from 'react';
-import { Property, PropertyReport, Finding, Action, UploadedPhoto } from '../types';
+import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
 import { submitReport, uploadFile } from '../api';
 import { isValidUrl } from '../utils';
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
+import ComplaintFileUpload from './ComplaintFileUpload';
 import FindingsList from './FindingsList';
 import ActionsList from './ActionsList';
 import './PropertyReportForm.css';
@@ -27,6 +28,7 @@ export default function PropertyReportForm() {
     corrector: '',
   });
   const [mainPhotos, setMainPhotos] = useState<UploadedPhoto[]>([]);
+  const [complaintFiles, setComplaintFiles] = useState<ComplaintFile[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +71,7 @@ export default function PropertyReportForm() {
         corrector: '',
       });
       setMainPhotos([]);
+      setComplaintFiles([]);
       setFindings([]);
       setActions([]);
     }
@@ -87,8 +90,9 @@ export default function PropertyReportForm() {
       return 'يرجى تحديد نوع الزيارة | Please specify visit type';
     }
 
-    if (!formData.complaint.trim()) {
-      return 'يرجى كتابة البلاغ | Please enter complaint';
+    // Only require complaint if visit type is "complaint"
+    if (formData.visitType === 'complaint' && !formData.complaint.trim()) {
+      return 'يرجى كتابة تفاصيل البلاغ | Please enter complaint details';
     }
 
     if (formData.locationLink && !isValidUrl(formData.locationLink)) {
@@ -159,7 +163,20 @@ export default function PropertyReportForm() {
         };
       };
 
+      const uploadComplaintFiles = async () => {
+        if (complaintFiles.length === 0) return [];
+        const uploadPromises = complaintFiles.map((file) =>
+          uploadFile(file.file, selectedProperty.code)
+        );
+        const results = await Promise.all(uploadPromises);
+        return complaintFiles.map((file, index) => ({
+          ...file,
+          uploadedUrl: results[index].url,
+        }));
+      };
+
       const uploadedMainPhotos = await uploadMainPhotos();
+      const uploadedComplaintFiles = await uploadComplaintFiles();
       const uploadedFindings = await Promise.all(findings.map(uploadFindingPhotos));
 
       // Prepare report data
@@ -181,6 +198,7 @@ export default function PropertyReportForm() {
         mainPhotos: uploadedMainPhotos,
         visitType: formData.visitType,
         complaint: formData.complaint,
+        complaintFiles: uploadedComplaintFiles,
         findings: uploadedFindings,
         actions: actions,
         corrector: formData.corrector || undefined,
@@ -394,27 +412,50 @@ export default function PropertyReportForm() {
 
             <div className="field-group">
               <label htmlFor="visitType">نوع الزيارة | Visit Type *</label>
-              <input
-                type="text"
+              <select
                 id="visitType"
                 value={formData.visitType}
                 onChange={(e) => handleInputChange('visitType', e.target.value)}
-                placeholder="مثال: زيارة دورية، طارئة..."
                 required
-              />
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '16px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">-- اختر نوع الزيارة | Select Visit Type --</option>
+                <option value="routine">زيارة دورية | Routine Visit</option>
+                <option value="complaint">بلاغ | Complaint</option>
+              </select>
             </div>
 
-            <div className="field-group">
-              <label htmlFor="complaint">البلاغ | Complaint *</label>
-              <textarea
-                id="complaint"
-                value={formData.complaint}
-                onChange={(e) => handleInputChange('complaint', e.target.value)}
-                placeholder="اكتب تفاصيل البلاغ..."
-                rows={4}
-                required
-              />
-            </div>
+            {formData.visitType === 'complaint' && (
+              <>
+                <div className="field-group">
+                  <label htmlFor="complaint">تفاصيل البلاغ | Complaint Details *</label>
+                  <textarea
+                    id="complaint"
+                    value={formData.complaint}
+                    onChange={(e) => handleInputChange('complaint', e.target.value)}
+                    placeholder="اكتب تفاصيل البلاغ..."
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                <div className="field-group">
+                  <label>ملفات البلاغ | Complaint Files (Optional)</label>
+                  <ComplaintFileUpload
+                    files={complaintFiles}
+                    onFilesChange={setComplaintFiles}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Findings */}

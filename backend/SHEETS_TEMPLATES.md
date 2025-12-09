@@ -73,27 +73,33 @@ If you have existing data in CSV format:
 | N | block | Complex (مجمع) | Text |
 | O | locationDescription | Location description | Text |
 | P | locationLink | Google Maps link | Text |
-| Q | visitType | Type of visit | Text |
-| R | complaint | Complaint details | Text |
-| S | mainPhotosCount | Number of main photos | Number |
-| T | mainPhotosUrls | URLs of main photos | JSON Array |
-| U | findingsCount | Number of findings | Number |
-| V | findings | Findings with photos | JSON Array |
-| W | actionsCount | Number of actions | Number |
-| X | actions | Actions taken | JSON Array |
-| Y | corrector | Corrector name (optional) | Text |
-| Z | inspectorName | Inspector name (optional) | Text |
+| Q | visitType | Type of visit (routine/complaint) | Text |
+| R | complaint | Complaint details (if visitType=complaint) | Text |
+| S | complaintFilesCount | Number of complaint files | Number |
+| T | complaintFiles | Complaint files (PDFs, images, etc.) | JSON Array |
+| U | mainPhotosCount | Number of main photos | Number |
+| V | mainPhotosUrls | URLs of main photos | JSON Array |
+| W | findingsCount | Number of findings | Number |
+| X | findings | Findings with photos | JSON Array |
+| Y | actionsCount | Number of actions | Number |
+| Z | actions | Actions taken | JSON Array |
+| AA | corrector | Corrector name (optional) | Text |
+| AB | inspectorName | Inspector name (optional) | Text |
 
 ### Example Headers (Copy-Paste):
 
 ```
-reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName
+reportId	submittedAt	propertyId	propertyCode	propertyName	waqfType	propertyType	endowedTo	building	unitNumber	road	area	governorate	block	locationDescription	locationLink	visitType	complaint	complaintFilesCount	complaintFiles	mainPhotosCount	mainPhotosUrls	findingsCount	findings	actionsCount	actions	corrector	inspectorName
 ```
 
 ### Notes:
 
-- **Columns T, V, X** contain JSON data (arrays)
+- **Columns T, V, X, Z** contain JSON data (arrays)
 - **Columns F-N** store property details that can be edited during report submission
+- **Column Q (visitType)** can be "routine" or "complaint"
+  - If "routine": complaint field (R) is optional
+  - If "complaint": complaint field (R) is required, and complaint files (T) can be attached
+- **Complaint files (Column T)** can include PDFs, images, documents, videos, etc.
 - Data is automatically added by the backend when reports are submitted
 - You can add formulas in additional columns for analysis
 - Don't delete or rename these columns - the backend depends on them

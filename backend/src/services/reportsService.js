@@ -21,14 +21,16 @@ import { format } from 'date-fns';
  * Column P: locationLink
  * Column Q: visitType
  * Column R: complaint
- * Column S: mainPhotosCount
- * Column T: mainPhotosUrls (JSON string)
- * Column U: findingsCount
- * Column V: findings (JSON string)
- * Column W: actionsCount
- * Column X: actions (JSON string)
- * Column Y: corrector
- * Column Z: inspectorName
+ * Column S: complaintFilesCount
+ * Column T: complaintFiles (JSON string)
+ * Column U: mainPhotosCount
+ * Column V: mainPhotosUrls (JSON string)
+ * Column W: findingsCount
+ * Column X: findings (JSON string)
+ * Column Y: actionsCount
+ * Column Z: actions (JSON string)
+ * Column AA: corrector
+ * Column AB: inspectorName
  */
 
 /**
@@ -47,6 +49,16 @@ export async function saveReport(report) {
     // Format photos URLs
     const mainPhotosUrls = JSON.stringify(
       report.mainPhotos?.map(p => p.uploadedUrl || p.url) || []
+    );
+
+    // Format complaint files
+    const complaintFiles = JSON.stringify(
+      report.complaintFiles?.map(f => ({
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        url: f.uploadedUrl || ''
+      })) || []
     );
 
     // Format findings (text + photo URLs)
@@ -82,20 +94,22 @@ export async function saveReport(report) {
       report.locationLink || '',                   // P: locationLink
       report.visitType || '',                      // Q: visitType
       report.complaint || '',                      // R: complaint
-      report.mainPhotos?.length || 0,              // S: mainPhotosCount
-      mainPhotosUrls,                              // T: mainPhotosUrls
-      report.findings?.length || 0,                // U: findingsCount
-      findings,                                    // V: findings
-      report.actions?.length || 0,                 // W: actionsCount
-      actions,                                     // X: actions
-      report.corrector || '',                      // Y: corrector
-      report.inspectorName || ''                   // Z: inspectorName
+      report.complaintFiles?.length || 0,          // S: complaintFilesCount
+      complaintFiles,                              // T: complaintFiles
+      report.mainPhotos?.length || 0,              // U: mainPhotosCount
+      mainPhotosUrls,                              // V: mainPhotosUrls
+      report.findings?.length || 0,                // W: findingsCount
+      findings,                                    // X: findings
+      report.actions?.length || 0,                 // Y: actionsCount
+      actions,                                     // Z: actions
+      report.corrector || '',                      // AA: corrector
+      report.inspectorName || ''                   // AB: inspectorName
     ];
 
     // Append to sheet
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:Z`,
+      range: `${sheetName}!A:AB`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -129,7 +143,7 @@ export async function getAllReports() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:Z`, // Skip header row
+      range: `${sheetName}!A2:AB`, // Skip header row
     });
 
     const rows = response.data.values || [];
@@ -153,14 +167,16 @@ export async function getAllReports() {
       locationLink: row[15] || '',
       visitType: row[16] || '',
       complaint: row[17] || '',
-      mainPhotosCount: parseInt(row[18]) || 0,
-      mainPhotosUrls: row[19] ? JSON.parse(row[19]) : [],
-      findingsCount: parseInt(row[20]) || 0,
-      findings: row[21] ? JSON.parse(row[21]) : [],
-      actionsCount: parseInt(row[22]) || 0,
-      actions: row[23] ? JSON.parse(row[23]) : [],
-      corrector: row[24] || '',
-      inspectorName: row[25] || ''
+      complaintFilesCount: parseInt(row[18]) || 0,
+      complaintFiles: row[19] ? JSON.parse(row[19]) : [],
+      mainPhotosCount: parseInt(row[20]) || 0,
+      mainPhotosUrls: row[21] ? JSON.parse(row[21]) : [],
+      findingsCount: parseInt(row[22]) || 0,
+      findings: row[23] ? JSON.parse(row[23]) : [],
+      actionsCount: parseInt(row[24]) || 0,
+      actions: row[25] ? JSON.parse(row[25]) : [],
+      corrector: row[26] || '',
+      inspectorName: row[27] || ''
     }));
 
     return reports;
