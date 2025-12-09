@@ -1,4 +1,5 @@
 import * as googleAuth from '../config/google-oauth.js';
+import fs from 'fs';
 
 /**
  * Render login page
@@ -345,7 +346,6 @@ export function checkStatus(req, res) {
 export function logout(req, res) {
   try {
     const tokenPath = process.env.OAUTH_TOKEN_PATH || './oauth-tokens.json';
-    const fs = await import('fs');
 
     if (fs.existsSync(tokenPath)) {
       fs.unlinkSync(tokenPath);
