@@ -7,21 +7,28 @@ import { Readable } from 'stream';
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
  * └── "843, سكني, الفقراء والمساكين" (Code, PropertyType, EndowedTo)
- *     └── "2024-01-15" (Date)
- *         ├── الصور الرئيسية/ (Main Photos)
- *         │   ├── photo1.jpg
- *         │   └── photo2.jpg
- *         ├── Finding1 - [finding description]/
- *         │   ├── photo1.jpg
- *         │   └── photo2.jpg
- *         └── Finding2 - [finding description]/
- *             └── photo1.jpg
+ *     ├── "2024-01-15" (Date - first upload of the day)
+ *     │   ├── الصور الرئيسية/ (Main Photos)
+ *     │   │   ├── photo1.jpg
+ *     │   │   └── photo2.jpg
+ *     │   └── ملفات البلاغ/ (Report Files)
+ *     │       └── report.pdf
+ *     ├── "2024-01-15 (2nd)" (Date - second upload of the day)
+ *     │   └── الصور الرئيسية/
+ *     │       └── photo3.jpg
+ *     └── "2024-01-15 (3rd)" (Date - third upload of the day)
+ *         └── الصور الرئيسية/
+ *             └── photo4.jpg
+ *
+ * Note: Each upload session creates a new versioned date folder to keep
+ * different inspection visits separate, even if on the same day.
  */
 
 /**
  * Get or create a folder in Google Drive
+ * @param {boolean} allowReuse - If false, will create new folder even if one exists
  */
-async function getOrCreateFolder(parentFolderId, folderName) {
+async function getOrCreateFolder(parentFolderId, folderName, allowReuse = true) {
   const drive = await getDriveClient();
 
   // Escape single quotes in folder name for query
@@ -36,7 +43,7 @@ async function getOrCreateFolder(parentFolderId, folderName) {
     spaces: 'drive'
   });
 
-  if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+  if (searchResponse.data.files && searchResponse.data.files.length > 0 && allowReuse) {
     // Folder exists - reuse it
     console.log(`   ♻️  Reusing existing folder: ${folderName}`);
     return searchResponse.data.files[0].id;
@@ -59,6 +66,83 @@ async function getOrCreateFolder(parentFolderId, folderName) {
 }
 
 /**
+ * Find the next available versioned folder name
+ * E.g., if "2025-12-10" exists, returns "2025-12-10 (2nd)"
+ */
+async function getNextVersionedFolderName(parentFolderId, baseName) {
+  const drive = await getDriveClient();
+
+  // Search for all folders matching the base pattern
+  const escapedBaseName = baseName.replace(/'/g, "\\'");
+
+  // Get all folders that start with the base name
+  const query = `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+  const searchResponse = await drive.files.list({
+    q: query,
+    fields: 'files(id, name)',
+    spaces: 'drive'
+  });
+
+  if (!searchResponse.data.files || searchResponse.data.files.length === 0) {
+    // No folders exist, use base name
+    return { name: baseName, version: 1 };
+  }
+
+  // Find all versions of this date folder
+  const versions = [];
+  const baseNamePattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: \\((\\d+)(?:st|nd|rd|th)\\))?$`);
+
+  searchResponse.data.files.forEach(file => {
+    const match = file.name.match(baseNamePattern);
+    if (match) {
+      if (match[1]) {
+        // It's a numbered version like "2025-12-10 (2nd)"
+        versions.push(parseInt(match[1]));
+      } else if (file.name === baseName) {
+        // It's the base version "2025-12-10"
+        versions.push(1);
+      }
+    }
+  });
+
+  if (versions.length === 0) {
+    // No matching folders found
+    return { name: baseName, version: 1 };
+  }
+
+  // Find the highest version and increment
+  const maxVersion = Math.max(...versions);
+  const nextVersion = maxVersion + 1;
+
+  // Create the suffix (2nd, 3rd, 4th, etc.)
+  const suffix = getOrdinalSuffix(nextVersion);
+  const versionedName = `${baseName} (${suffix})`;
+
+  console.log(`   🔢 Found ${versions.length} existing version(s), creating version ${nextVersion}`);
+  return { name: versionedName, version: nextVersion };
+}
+
+/**
+ * Get ordinal suffix for a number (1st, 2nd, 3rd, 4th, etc.)
+ */
+function getOrdinalSuffix(num) {
+  const j = num % 10;
+  const k = num % 100;
+
+  if (j === 1 && k !== 11) {
+    return `${num}st`;
+  }
+  if (j === 2 && k !== 12) {
+    return `${num}nd`;
+  }
+  if (j === 3 && k !== 13) {
+    return `${num}rd`;
+  }
+  return `${num}th`;
+}
+
+/**
  * Sanitize folder name to be safe for Google Drive
  */
 function sanitizeFolderName(name) {
@@ -69,6 +153,7 @@ function sanitizeFolderName(name) {
 /**
  * Get organized folder path for uploads
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
+ * If date folder exists, creates a new versioned folder (e.g., "2025-12-10 (2nd)")
  */
 async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -78,8 +163,12 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date
-  const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date (with versioning)
+  // Get the next available version for today's date
+  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+
+  console.log(`   📅 Using date folder: ${versionedDate.name} (version ${versionedDate.version})`);
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
