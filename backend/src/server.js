@@ -40,19 +40,59 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error('❌ Server Error:', err.message);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('   Stack:', err.stack);
+  }
 
+  // Handle Multer errors (file upload errors)
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'File too large',
-        message: 'Maximum file size is 10MB'
+        message: 'Maximum file size is 10MB',
+        details: `The uploaded file exceeds the 10MB size limit`,
+        code: 'LIMIT_FILE_SIZE'
+      });
+    } else if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        error: 'Too many files',
+        message: 'Maximum 10 files allowed',
+        details: 'You can upload up to 10 files at once',
+        code: 'LIMIT_FILE_COUNT'
+      });
+    } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        error: 'Unexpected file field',
+        message: 'Invalid file field name',
+        details: 'Use "file" for single upload or "files" for multiple uploads',
+        code: 'LIMIT_UNEXPECTED_FILE'
+      });
+    } else {
+      return res.status(400).json({
+        error: 'File upload error',
+        message: err.message,
+        details: 'An error occurred during file upload',
+        code: err.code
       });
     }
   }
 
+  // Handle file filter errors (file type validation)
+  if (err.message?.includes('Only image files are allowed') ||
+      err.message?.includes('Only images, PDFs, Word documents')) {
+    return res.status(400).json({
+      error: 'Invalid file type',
+      message: err.message,
+      details: 'Please check the allowed file types for this subfolder',
+      code: 'INVALID_FILE_TYPE'
+    });
+  }
+
+  // General error handling
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
+    details: err.status === 500 ? 'An unexpected error occurred. Please try again.' : err.message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });

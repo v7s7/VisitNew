@@ -102,6 +102,7 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
     const drive = await getDriveClient();
 
     // Get organized folder path
+    console.log(`   📂 Organizing folder structure...`);
     const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder);
 
     // Create readable stream from buffer
@@ -111,6 +112,7 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._\u0600-\u06FF\s-]/g, '_');
 
     // Upload file
+    console.log(`   ⬆️  Uploading to Google Drive: ${sanitizedFileName}`);
     const fileMetadata = {
       name: sanitizedFileName,
       parents: [folderId]
@@ -126,6 +128,8 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
       media: media,
       fields: 'id, name, webViewLink, webContentLink'
     });
+
+    console.log(`   ✓ File uploaded successfully: ${response.data.id}`);
 
     // Make file accessible (optional - set appropriate permissions)
     // For now, we'll keep it private to the service account
@@ -147,8 +151,20 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
       downloadUrl: response.data.webContentLink
     };
   } catch (error) {
-    console.error('Error uploading file to Google Drive:', error.message);
-    throw new Error('Failed to upload file to Google Drive');
+    console.error('❌ Error uploading file to Google Drive:', error.message);
+
+    // Provide more specific error messages
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error('Network error: Unable to connect to Google Drive. Please check your internet connection.');
+    } else if (error.code === 403) {
+      throw new Error('Permission denied: Please check your Google Drive credentials and permissions.');
+    } else if (error.code === 404) {
+      throw new Error('Google Drive folder not found. Please verify your GOOGLE_DRIVE_FOLDER_ID.');
+    } else if (error.message?.includes('quota')) {
+      throw new Error('Google Drive storage quota exceeded. Please free up space or upgrade your storage.');
+    } else {
+      throw new Error(`Google Drive upload failed: ${error.message}`);
+    }
   }
 }
 
@@ -156,11 +172,19 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
  * Upload multiple files
  */
 export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
-  const uploadPromises = files.map(file =>
-    uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder)
-  );
+  const uploadPromises = files.map((file, index) => {
+    console.log(`   [${index + 1}/${files.length}] Queuing: ${file.originalname}`);
+    return uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder);
+  });
 
-  return await Promise.all(uploadPromises);
+  try {
+    const results = await Promise.all(uploadPromises);
+    console.log(`   ✓ All ${results.length} files uploaded successfully`);
+    return results;
+  } catch (error) {
+    console.error(`   ❌ Error during batch upload: ${error.message}`);
+    throw error;
+  }
 }
 
 /**
