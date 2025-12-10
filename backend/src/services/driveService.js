@@ -7,26 +7,24 @@ import { Readable } from 'stream';
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
  * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo)
- *     ├── "2025-12-10" (First upload today)
+ *     ├── "2025-12-10" (First report)
  *     │   ├── الصور الرئيسية/
- *     │   │   └── photo1.jpg
- *     │   └── ملفات البلاغ/
- *     │       └── report.pdf
- *     ├── "2025-12-10 (2nd)" (Second upload today)
- *     │   ├── الصور الرئيسية/
+ *     │   │   ├── photo1.jpg
  *     │   │   └── photo2.jpg
+ *     │   ├── ملفات البلاغ/
+ *     │   │   └── report.pdf
  *     │   └── Finding1 - broken door/
  *     │       └── finding.jpg
- *     └── "2025-12-10 (3rd)" (Third upload today)
- *         └── الصور الرئيسية/
- *             └── photo3.jpg
+ *     └── "2025-12-10 (2nd)" (Second report - same day)
+ *         ├── الصور الرئيسية/
+ *         │   └── photo3.jpg
+ *         └── ملفات البلاغ/
+ *             └── report2.pdf
  *
  * How versioning works:
- * - Automatic versioning: Each upload creates a new dated folder if one exists
- * - First upload: Creates "2025-12-10"
- * - Second upload: Creates "2025-12-10 (2nd)"
- * - Third upload: Creates "2025-12-10 (3rd)"
- * - This prevents file overwrites and keeps each submission separate
+ * - Same report: All files go to same date folder (newSession=false, default)
+ * - New report: Creates versioned folder "2025-12-10 (2nd)" (newSession=true)
+ * - EACH REPORT = ONE DATE FOLDER
  */
 
 /**
@@ -160,7 +158,7 @@ function sanitizeFolderName(name) {
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
  * Automatically creates versioned date folders for multiple uploads on same day
  */
-async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = true) {
+async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -168,15 +166,16 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Always check for existing date folders and create versioned folder
-  // This prevents file overwrites and separates each upload session
-  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-
-  if (versionedDate.version > 1) {
-    console.log(`   📅 Created versioned folder: ${versionedDate.name} (${versionedDate.version} uploads today)`);
+  // Create date folder - version only if newSession=true
+  let dateFolderId;
+  if (newSession) {
+    // Create new versioned folder for new report submission
+    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+    console.log(`   📅 New report: Created ${versionedDate.name} (report #${versionedDate.version} today)`);
   } else {
-    console.log(`   📅 Using date folder: ${versionedDate.name} (first upload today)`);
+    // Reuse existing date folder for same report
+    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
   }
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
