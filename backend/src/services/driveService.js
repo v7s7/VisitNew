@@ -7,23 +7,26 @@ import { Readable } from 'stream';
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
  * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo)
- *     ├── "2025-12-10" (First inspection/report)
- *     │   ├── الصور الرئيسية/ (Main Photos)
- *     │   │   ├── photo1.jpg
+ *     ├── "2025-12-10" (First upload today)
+ *     │   ├── الصور الرئيسية/
+ *     │   │   └── photo1.jpg
+ *     │   └── ملفات البلاغ/
+ *     │       └── report.pdf
+ *     ├── "2025-12-10 (2nd)" (Second upload today)
+ *     │   ├── الصور الرئيسية/
  *     │   │   └── photo2.jpg
- *     │   ├── ملفات البلاغ/ (Report Files)
- *     │   │   └── report.pdf
- *     │   └── Finding1 - [description]/
- *     │       └── finding_photo.jpg
- *     └── "2025-12-10 (2nd)" (Second inspection/report - same day)
- *         ├── الصور الرئيسية/
- *         │   └── photo3.jpg
- *         └── ملفات البلاغ/
- *             └── report2.pdf
+ *     │   └── Finding1 - broken door/
+ *     │       └── finding.jpg
+ *     └── "2025-12-10 (3rd)" (Third upload today)
+ *         └── الصور الرئيسية/
+ *             └── photo3.jpg
  *
  * How versioning works:
- * - Regular uploads (newSession=false): Reuse existing date folder
- * - New inspection/report (newSession=true): Create versioned date folder (2nd, 3rd, etc.)
+ * - Automatic versioning: Each upload creates a new dated folder if one exists
+ * - First upload: Creates "2025-12-10"
+ * - Second upload: Creates "2025-12-10 (2nd)"
+ * - Third upload: Creates "2025-12-10 (3rd)"
+ * - This prevents file overwrites and keeps each submission separate
  */
 
 /**
@@ -155,9 +158,9 @@ function sanitizeFolderName(name) {
 /**
  * Get organized folder path for uploads
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
- * @param {boolean} newSession - If true, creates versioned date folder (e.g., "2025-12-10 (2nd)")
+ * Automatically creates versioned date folders for multiple uploads on same day
  */
-async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
+async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = true) {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -165,16 +168,15 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date
-  let dateFolderId;
-  if (newSession) {
-    // Create new versioned folder for new inspection session
-    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-    console.log(`   📅 Created new session folder: ${versionedDate.name} (version ${versionedDate.version})`);
+  // Always check for existing date folders and create versioned folder
+  // This prevents file overwrites and separates each upload session
+  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+
+  if (versionedDate.version > 1) {
+    console.log(`   📅 Created versioned folder: ${versionedDate.name} (${versionedDate.version} uploads today)`);
   } else {
-    // Reuse existing date folder
-    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+    console.log(`   📅 Using date folder: ${versionedDate.name} (first upload today)`);
   }
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
