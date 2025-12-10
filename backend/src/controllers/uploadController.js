@@ -17,7 +17,7 @@ export async function uploadFileHandler(req, res) {
       });
     }
 
-    const { propertyCode, propertyType, endowedTo, subfolder } = req.body;
+    const { propertyCode, propertyType, endowedTo, subfolder, newSession } = req.body;
 
     console.log('📥 Upload request received:', {
       file: req.file?.originalname,
@@ -26,7 +26,8 @@ export async function uploadFileHandler(req, res) {
       propertyCode,
       propertyType,
       endowedTo,
-      subfolder
+      subfolder,
+      newSession: newSession === 'true' || newSession === true ? true : false
     });
 
     if (!propertyCode) {
@@ -56,7 +57,13 @@ export async function uploadFileHandler(req, res) {
     }
 
     // Upload to Google Drive
-    console.log(`⏳ Uploading ${file.originalname} to Google Drive...`);
+    const isNewSession = newSession === 'true' || newSession === true;
+    if (isNewSession) {
+      console.log(`⏳ Uploading ${file.originalname} to Google Drive (NEW INSPECTION SESSION)...`);
+    } else {
+      console.log(`⏳ Uploading ${file.originalname} to Google Drive...`);
+    }
+
     uploadResult = await driveService.uploadFile(
       file.buffer,
       file.originalname,
@@ -64,7 +71,8 @@ export async function uploadFileHandler(req, res) {
       propertyCode,
       propertyType || '',
       endowedTo || '',
-      subfolder || 'الصور الرئيسية'
+      subfolder || 'الصور الرئيسية',
+      isNewSession
     );
 
     console.log(`✅ Upload successful: ${file.originalname} → ${uploadResult.fileName}`);
@@ -124,11 +132,12 @@ export async function uploadMultipleFilesHandler(req, res) {
       });
     }
 
-    const { propertyCode, propertyType, endowedTo, subfolder } = req.body;
+    const { propertyCode, propertyType, endowedTo, subfolder, newSession } = req.body;
 
     console.log(`📥 Multiple upload request received: ${req.files.length} files`);
     console.log(`   Property: ${propertyCode}, ${propertyType}, ${endowedTo}`);
     console.log(`   Files: ${req.files.map(f => f.originalname).join(', ')}`);
+    console.log(`   New session: ${newSession === 'true' || newSession === true ? 'YES' : 'NO'}`);
 
     if (!propertyCode) {
       console.error('❌ Property code missing from request');
@@ -156,13 +165,20 @@ export async function uploadMultipleFilesHandler(req, res) {
     }
 
     // Upload all files
-    console.log(`⏳ Uploading ${req.files.length} files to Google Drive...`);
+    const isNewSession = newSession === 'true' || newSession === true;
+    if (isNewSession) {
+      console.log(`⏳ Uploading ${req.files.length} files to Google Drive (NEW INSPECTION SESSION)...`);
+    } else {
+      console.log(`⏳ Uploading ${req.files.length} files to Google Drive...`);
+    }
+
     uploadedFiles = await driveService.uploadMultipleFiles(
       req.files,
       propertyCode,
       propertyType || '',
       endowedTo || '',
-      subfolder || 'الصور الرئيسية'
+      subfolder || 'الصور الرئيسية',
+      isNewSession
     );
 
     console.log(`✅ Successfully uploaded ${uploadedFiles.length} files`);

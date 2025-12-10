@@ -7,20 +7,23 @@ import { Readable } from 'stream';
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
  * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo)
- *     └── "2025-12-10" (Date)
- *         ├── الصور الرئيسية/ (Main Photos)
- *         │   ├── photo1.jpg
- *         │   ├── photo2.jpg
+ *     ├── "2025-12-10" (First inspection/report)
+ *     │   ├── الصور الرئيسية/ (Main Photos)
+ *     │   │   ├── photo1.jpg
+ *     │   │   └── photo2.jpg
+ *     │   ├── ملفات البلاغ/ (Report Files)
+ *     │   │   └── report.pdf
+ *     │   └── Finding1 - [description]/
+ *     │       └── finding_photo.jpg
+ *     └── "2025-12-10 (2nd)" (Second inspection/report - same day)
+ *         ├── الصور الرئيسية/
  *         │   └── photo3.jpg
- *         ├── ملفات البلاغ/ (Report Files)
- *         │   ├── report.pdf
- *         │   └── document.docx
- *         └── Finding1 - [description]/
- *             └── finding_photo.jpg
+ *         └── ملفات البلاغ/
+ *             └── report2.pdf
  *
- * Note: All uploads for the same property on the same day go to the same date folder.
- * Versioned folders (e.g., "2025-12-10 (2nd)") will be created only when submitting
- * a new report/inspection for the same property on the same day.
+ * How versioning works:
+ * - Regular uploads (newSession=false): Reuse existing date folder
+ * - New inspection/report (newSession=true): Create versioned date folder (2nd, 3rd, etc.)
  */
 
 /**
@@ -152,9 +155,9 @@ function sanitizeFolderName(name) {
 /**
  * Get organized folder path for uploads
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
- * Reuses existing date folder for multiple uploads on the same day
+ * @param {boolean} newSession - If true, creates versioned date folder (e.g., "2025-12-10 (2nd)")
  */
-async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
+async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -162,8 +165,17 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date (reuses existing)
-  const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date
+  let dateFolderId;
+  if (newSession) {
+    // Create new versioned folder for new inspection session
+    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+    console.log(`   📅 Created new session folder: ${versionedDate.name} (version ${versionedDate.version})`);
+  } else {
+    // Reuse existing date folder
+    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+  }
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
@@ -180,14 +192,15 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
  * @param {string} propertyType - Property type (نوع العقار)
  * @param {string} endowedTo - Endowed to (موقوف على)
  * @param {string} subfolder - Subfolder name (e.g., 'الصور الرئيسية', 'Finding1 - description')
+ * @param {boolean} newSession - If true, creates new versioned date folder
  */
-export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
+export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
   try {
     const drive = await getDriveClient();
 
     // Get organized folder path
     console.log(`   📂 Organizing folder structure...`);
-    const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder);
+    const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder, newSession);
 
     // Create readable stream from buffer
     const bufferStream = Readable.from(fileBuffer);
@@ -254,11 +267,12 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
 
 /**
  * Upload multiple files
+ * @param {boolean} newSession - If true, creates new versioned date folder for all files
  */
-export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
+export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
   const uploadPromises = files.map((file, index) => {
     console.log(`   [${index + 1}/${files.length}] Queuing: ${file.originalname}`);
-    return uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder);
+    return uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder, newSession);
   });
 
   try {
