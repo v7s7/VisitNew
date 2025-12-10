@@ -40,6 +40,21 @@ export async function uploadFileHandler(req, res) {
 
     const file = req.file;
 
+    // Additional validation: check file type matches subfolder requirements
+    // This is a backup validation in case multer's fileFilter didn't have access to subfolder
+    const isImage = file.mimetype.startsWith('image/');
+    const targetSubfolder = subfolder || 'الصور الرئيسية';
+
+    if (targetSubfolder !== 'ملفات البلاغ' && !isImage) {
+      console.error(`❌ Invalid file type for subfolder "${targetSubfolder}"`);
+      return res.status(400).json({
+        error: 'Invalid file type',
+        message: `Only image files are allowed for "${targetSubfolder}"`,
+        details: `You attempted to upload a ${file.mimetype} file to a photo folder. Use "ملفات البلاغ" subfolder for documents.`,
+        code: 'INVALID_FILE_TYPE_FOR_SUBFOLDER'
+      });
+    }
+
     // Upload to Google Drive
     console.log(`⏳ Uploading ${file.originalname} to Google Drive...`);
     uploadResult = await driveService.uploadFile(
@@ -122,6 +137,22 @@ export async function uploadMultipleFilesHandler(req, res) {
         message: 'Please provide propertyCode in the request',
         details: 'propertyCode is a required field'
       });
+    }
+
+    // Additional validation: check file types match subfolder requirements
+    const targetSubfolder = subfolder || 'الصور الرئيسية';
+    if (targetSubfolder !== 'ملفات البلاغ') {
+      const nonImageFiles = req.files.filter(f => !f.mimetype.startsWith('image/'));
+      if (nonImageFiles.length > 0) {
+        console.error(`❌ Invalid file types for subfolder "${targetSubfolder}"`);
+        return res.status(400).json({
+          error: 'Invalid file type',
+          message: `Only image files are allowed for "${targetSubfolder}"`,
+          details: `Found ${nonImageFiles.length} non-image file(s): ${nonImageFiles.map(f => f.originalname).join(', ')}. Use "ملفات البلاغ" subfolder for documents.`,
+          code: 'INVALID_FILE_TYPE_FOR_SUBFOLDER',
+          invalidFiles: nonImageFiles.map(f => ({ name: f.originalname, type: f.mimetype }))
+        });
+      }
     }
 
     // Upload all files
