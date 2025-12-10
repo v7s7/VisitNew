@@ -6,22 +6,21 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── "843, سكني, الفقراء والمساكين" (Code, PropertyType, EndowedTo)
- *     ├── "2024-01-15" (Date - first upload of the day)
- *     │   ├── الصور الرئيسية/ (Main Photos)
- *     │   │   ├── photo1.jpg
- *     │   │   └── photo2.jpg
- *     │   └── ملفات البلاغ/ (Report Files)
- *     │       └── report.pdf
- *     ├── "2024-01-15 (2nd)" (Date - second upload of the day)
- *     │   └── الصور الرئيسية/
- *     │       └── photo3.jpg
- *     └── "2024-01-15 (3rd)" (Date - third upload of the day)
- *         └── الصور الرئيسية/
- *             └── photo4.jpg
+ * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo)
+ *     └── "2025-12-10" (Date)
+ *         ├── الصور الرئيسية/ (Main Photos)
+ *         │   ├── photo1.jpg
+ *         │   ├── photo2.jpg
+ *         │   └── photo3.jpg
+ *         ├── ملفات البلاغ/ (Report Files)
+ *         │   ├── report.pdf
+ *         │   └── document.docx
+ *         └── Finding1 - [description]/
+ *             └── finding_photo.jpg
  *
- * Note: Each upload session creates a new versioned date folder to keep
- * different inspection visits separate, even if on the same day.
+ * Note: All uploads for the same property on the same day go to the same date folder.
+ * Versioned folders (e.g., "2025-12-10 (2nd)") will be created only when submitting
+ * a new report/inspection for the same property on the same day.
  */
 
 /**
@@ -153,7 +152,7 @@ function sanitizeFolderName(name) {
 /**
  * Get organized folder path for uploads
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
- * If date folder exists, creates a new versioned folder (e.g., "2025-12-10 (2nd)")
+ * Reuses existing date folder for multiple uploads on the same day
  */
 async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -163,12 +162,8 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date (with versioning)
-  // Get the next available version for today's date
-  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-
-  console.log(`   📅 Using date folder: ${versionedDate.name} (version ${versionedDate.version})`);
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date (reuses existing)
+  const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
