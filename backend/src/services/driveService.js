@@ -7,23 +7,24 @@ import { Readable } from 'stream';
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
  * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo) ← ALWAYS REUSED
- *     ├── "2025-12-10" (First report - all files together)
- *     │   ├── الصور الرئيسية/
- *     │   │   ├── photo1.jpg
- *     │   │   └── photo2.jpg
- *     │   ├── ملفات البلاغ/
- *     │   │   └── report.pdf
- *     │   └── Finding1 - broken door/
- *     │       └── finding.jpg
- *     └── "2025-12-10 (2nd)" (Second report - when newSession=true)
- *         ├── الصور الرئيسية/
- *         └── ملفات البلاغ/
+ *     └── "2025-12-10" ← ONE date folder per day, ALWAYS REUSED
+ *         ├── الصور الرئيسية/ ← all main photos
+ *         │   ├── photo1.jpg
+ *         │   └── photo2.jpg
+ *         ├── ملفات البلاغ/ ← all complaint files
+ *         │   └── report.pdf
+ *         ├── Finding 1 - broken door/ ← all photos for finding 1
+ *         │   ├── photo1.jpg
+ *         │   └── photo2.jpg
+ *         └── Finding 2 - cracked wall/ ← all photos for finding 2
+ *             └── photo.jpg
  *
  * How it works:
- * - Building/Property folder: ALWAYS REUSED
- * - Date folders: REUSED by default (all files for same report go together)
- * - When newSession=true: Creates "2025-12-10 (2nd)" for NEW report
- * - ONE REPORT = ONE DATE FOLDER (all files together)
+ * - Property folder: ALWAYS REUSED (same property = same folder)
+ * - Date folder: ALWAYS REUSED (same day = same folder, NO versioning)
+ * - Multiple submissions on same day: Add to existing date folder
+ * - Finding numbers: AUTO-DETECTED (scan existing, continue numbering)
+ * - ONE PROPERTY + ONE DATE = ONE FOLDER (all submissions together)
  */
 
 /**
@@ -68,17 +69,15 @@ async function getOrCreateFolder(parentFolderId, folderName, allowReuse = true) 
 }
 
 /**
- * Find the next available versioned folder name
- * E.g., if "2025-12-10" exists, returns "2025-12-10 (2nd)"
+ * Get the next available finding number
+ * Scans existing "Finding N - ..." folders and returns next N
+ * Example: If "Finding 1 - X" and "Finding 2 - Y" exist, returns 3
  */
-async function getNextVersionedFolderName(parentFolderId, baseName) {
+async function getNextFindingNumber(dateFolderId) {
   const drive = await getDriveClient();
 
-  // Search for all folders matching the base pattern
-  const escapedBaseName = baseName.replace(/'/g, "\\'");
-
-  // Get all folders that start with the base name
-  const query = `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  // Get all folders under the date folder
+  const query = `'${dateFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const searchResponse = await drive.files.list({
     q: query,
@@ -87,61 +86,29 @@ async function getNextVersionedFolderName(parentFolderId, baseName) {
   });
 
   if (!searchResponse.data.files || searchResponse.data.files.length === 0) {
-    // No folders exist, use base name
-    return { name: baseName, version: 1 };
+    // No folders exist yet, start with 1
+    return 1;
   }
 
-  // Find all versions of this date folder
-  const versions = [];
-  const baseNamePattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: \\((\\d+)(?:st|nd|rd|th)\\))?$`);
+  // Find all existing finding folders
+  const findingNumbers = [];
+  const findingPattern = /^Finding (\d+) - /;
 
   searchResponse.data.files.forEach(file => {
-    const match = file.name.match(baseNamePattern);
+    const match = file.name.match(findingPattern);
     if (match) {
-      if (match[1]) {
-        // It's a numbered version like "2025-12-10 (2nd)"
-        versions.push(parseInt(match[1]));
-      } else if (file.name === baseName) {
-        // It's the base version "2025-12-10"
-        versions.push(1);
-      }
+      findingNumbers.push(parseInt(match[1]));
     }
   });
 
-  if (versions.length === 0) {
-    // No matching folders found
-    return { name: baseName, version: 1 };
+  if (findingNumbers.length === 0) {
+    // No finding folders exist yet
+    return 1;
   }
 
-  // Find the highest version and increment
-  const maxVersion = Math.max(...versions);
-  const nextVersion = maxVersion + 1;
-
-  // Create the suffix (2nd, 3rd, 4th, etc.)
-  const suffix = getOrdinalSuffix(nextVersion);
-  const versionedName = `${baseName} (${suffix})`;
-
-  console.log(`   🔢 Found ${versions.length} existing version(s), creating version ${nextVersion}`);
-  return { name: versionedName, version: nextVersion };
-}
-
-/**
- * Get ordinal suffix for a number (1st, 2nd, 3rd, 4th, etc.)
- */
-function getOrdinalSuffix(num) {
-  const j = num % 10;
-  const k = num % 100;
-
-  if (j === 1 && k !== 11) {
-    return `${num}st`;
-  }
-  if (j === 2 && k !== 12) {
-    return `${num}nd`;
-  }
-  if (j === 3 && k !== 13) {
-    return `${num}rd`;
-  }
-  return `${num}th`;
+  // Return the next number after the highest
+  const maxNumber = Math.max(...findingNumbers);
+  return maxNumber + 1;
 }
 
 /**
@@ -155,30 +122,41 @@ function sanitizeFolderName(name) {
 /**
  * Get organized folder path for uploads
  * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
- * Automatically creates versioned date folders for multiple uploads on same day
+ *
+ * For findings: Extracts description and auto-assigns next finding number
+ * Example: Frontend sends "Finding 1 - Broken door" → Backend creates "Finding 3 - Broken door"
  */
-async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
+async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]
+  // Step 1: Get/create property folder (always reused)
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  let dateFolderId;
+  // Step 2: Get/create date folder (always reused - ONE folder per day)
+  const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+  console.log(`   📅 Using date folder: ${today}`);
 
-  if (newSession) {
-    // NEW report: Create versioned folder
-    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-    console.log(`   📅 New report: ${versionedDate.name} (report #${versionedDate.version} today)`);
-  } else {
-    // SAME report: Reuse existing date folder
-    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+  // Step 3: Handle subfolder
+  let finalSubfolderName = subfolder;
+
+  // Check if this is a finding folder
+  const findingMatch = subfolder.match(/^Finding \d+ - (.+)$/);
+  if (findingMatch) {
+    // Extract description from frontend's folder name
+    const description = findingMatch[1];
+
+    // Get next finding number from existing folders
+    const nextNumber = await getNextFindingNumber(dateFolderId);
+
+    // Create new finding folder name with correct number
+    finalSubfolderName = `Finding ${nextNumber} - ${description}`;
+    console.log(`   🔍 Creating finding folder: ${finalSubfolderName} (auto-detected next number)`);
   }
 
-  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
-  const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
+  // Create/reuse subfolder
+  const subFolderId = await getOrCreateFolder(dateFolderId, finalSubfolderName);
 
   return subFolderId;
 }
@@ -191,16 +169,15 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
  * @param {string} propertyCode - Property code for organization
  * @param {string} propertyType - Property type (نوع العقار)
  * @param {string} endowedTo - Endowed to (موقوف على)
- * @param {string} subfolder - Subfolder name (e.g., 'الصور الرئيسية', 'Finding1 - description')
- * @param {boolean} newSession - If true, creates new versioned date folder
+ * @param {string} subfolder - Subfolder name (e.g., 'الصور الرئيسية', 'Finding 1 - description')
  */
-export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
+export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   try {
     const drive = await getDriveClient();
 
     // Get organized folder path
     console.log(`   📂 Organizing folder structure...`);
-    const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder, newSession);
+    const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder);
 
     // Create readable stream from buffer
     const bufferStream = Readable.from(fileBuffer);
@@ -266,48 +243,28 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
 }
 
 /**
- * Upload multiple files
- * All files go to the SAME versioned date folder
+ * Upload multiple files to the same subfolder
+ * All files go to the SAME date folder (reused for same day)
+ * For findings: Each file can go to a different finding folder if needed
  */
-export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
+export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   try {
     const drive = await getDriveClient();
-    const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-    const today = format(new Date(), 'yyyy-MM-dd');
 
-    // Get property folder (reused)
-    const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
-    const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
-
-    // Get date folder ONCE for ALL files
-    let dateFolderId;
-    let folderDisplayName;
-
-    if (newSession) {
-      // NEW report: Create versioned folder
-      const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-      dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-      folderDisplayName = versionedDate.name;
-      console.log(`   📅 New report: ${versionedDate.name} (report #${versionedDate.version} today)`);
-    } else {
-      // SAME report: Reuse existing date folder
-      dateFolderId = await getOrCreateFolder(propertyFolderId, today);
-      folderDisplayName = today;
-    }
-
-    // Get subfolder ONCE for ALL files
-    const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
-
-    // Upload ALL files to the SAME folder
+    // Upload ALL files using the same organized path logic
     const uploadPromises = files.map(async (file, index) => {
       console.log(`   [${index + 1}/${files.length}] Uploading: ${file.originalname}`);
+
+      // Get organized folder path for this file
+      console.log(`   📂 Organizing folder structure for file ${index + 1}...`);
+      const folderId = await getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder);
 
       const bufferStream = Readable.from(file.buffer);
       const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9._\u0600-\u06FF\s-]/g, '_');
 
       const fileMetadata = {
         name: sanitizedFileName,
-        parents: [subFolderId]
+        parents: [folderId]
       };
 
       const media = {
@@ -332,7 +289,7 @@ export async function uploadMultipleFiles(files, propertyCode, propertyType, end
     });
 
     const results = await Promise.all(uploadPromises);
-    console.log(`   ✓ All ${results.length} files uploaded to ${folderDisplayName}/${subfolder}`);
+    console.log(`   ✓ All ${results.length} files uploaded to ${subfolder}`);
     return results;
   } catch (error) {
     console.error(`   ❌ Error during batch upload: ${error.message}`);
