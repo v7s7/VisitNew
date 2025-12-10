@@ -2,11 +2,13 @@ import { useState, FormEvent } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
 import { submitReport, uploadFile } from '../api';
 import { isValidUrl } from '../utils';
+import { generateReportPdf, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
 import ComplaintFileUpload from './ComplaintFileUpload';
 import FindingsList from './FindingsList';
 import ActionsList from './ActionsList';
+import PropertyReportPdfView from './PropertyReportPdfView';
 import './PropertyReportForm.css';
 
 export default function PropertyReportForm() {
@@ -37,6 +39,8 @@ export default function PropertyReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Auto-fill fields when property is selected
   const handlePropertySelect = (property: Property | null) => {
@@ -247,7 +251,92 @@ export default function PropertyReportForm() {
     }
   };
 
+  const handleGeneratePdf = async () => {
+    if (!selectedProperty) return;
+
+    // Build current report object from form state
+    const currentReport: PropertyReport = {
+      propertyId: selectedProperty.id,
+      propertyCode: selectedProperty.code,
+      propertyName: selectedProperty.name,
+      waqfType: formData.waqfType,
+      propertyType: formData.propertyType,
+      endowedTo: formData.endowedTo,
+      building: formData.building,
+      unitNumber: formData.unitNumber,
+      road: formData.road,
+      area: formData.area,
+      governorate: formData.governorate,
+      block: formData.block,
+      locationDescription: formData.locationDescription,
+      locationLink: formData.locationLink,
+      mainPhotos: mainPhotos,
+      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+      additionalNotes: formData.additionalNotes || undefined,
+      visitType: formData.visitType,
+      complaint: formData.complaint,
+      complaintFiles: complaintFiles,
+      findings: findings,
+      actions: actions,
+      corrector: formData.corrector || undefined,
+    };
+
+    // Validate report
+    const validationError = validateReportForPdf(currentReport);
+    if (validationError) {
+      setPdfError(validationError);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    setPdfError(null);
+
+    try {
+      await generateReportPdf(currentReport, 'pdf-content');
+      // Success - PDF downloaded
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      setPdfError(error.message || 'فشل إنشاء PDF. حاول مرة أخرى. | Failed to generate PDF. Try again.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const isFormDisabled = !selectedProperty;
+  const isPdfButtonDisabled = !selectedProperty || !formData.visitType || isGeneratingPdf;
+
+  // Build current report for PDF preview
+  const currentReportForPdf: PropertyReport | null = selectedProperty
+    ? {
+        propertyId: selectedProperty.id,
+        propertyCode: selectedProperty.code,
+        propertyName: selectedProperty.name,
+        waqfType: formData.waqfType,
+        propertyType: formData.propertyType,
+        endowedTo: formData.endowedTo,
+        building: formData.building,
+        unitNumber: formData.unitNumber,
+        road: formData.road,
+        area: formData.area,
+        governorate: formData.governorate,
+        block: formData.block,
+        locationDescription: formData.locationDescription,
+        locationLink: formData.locationLink,
+        mainPhotos: mainPhotos,
+        floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+        flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+        additionalNotes: formData.additionalNotes || undefined,
+        visitType: formData.visitType,
+        complaint: formData.complaint,
+        complaintFiles: complaintFiles,
+        findings: findings,
+        actions: actions,
+        corrector: formData.corrector || undefined,
+      }
+    : null;
 
   return (
     <form onSubmit={handleSubmit} className="property-report-form">
@@ -259,6 +348,12 @@ export default function PropertyReportForm() {
       {submitError && (
         <div className="alert alert-error" role="alert">
           {submitError}
+        </div>
+      )}
+
+      {pdfError && (
+        <div className="alert alert-error" role="alert">
+          {pdfError}
         </div>
       )}
 
@@ -534,8 +629,25 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Submit and PDF Buttons */}
           <div className="submit-section">
+            <button
+              type="button"
+              className="pdf-button"
+              onClick={handleGeneratePdf}
+              disabled={isPdfButtonDisabled}
+              title="حفظ كـ PDF / طباعة | Save as PDF / Print"
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <span className="loading"></span>
+                  <span>جاري إنشاء PDF...</span>
+                </>
+              ) : (
+                '📄 حفظ كـ PDF | Save as PDF'
+              )}
+            </button>
+
             <button
               type="submit"
               className="submit-button"
@@ -552,6 +664,23 @@ export default function PropertyReportForm() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Hidden PDF View for Generation */}
+      {currentReportForPdf && (
+        <div
+          id="pdf-content"
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            top: 0,
+          }}
+        >
+          <PropertyReportPdfView
+            report={currentReportForPdf}
+            generatedDate={formatBahrainDate()}
+          />
+        </div>
       )}
     </form>
   );

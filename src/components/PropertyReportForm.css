@@ -104,6 +104,42 @@
   margin: 0 calc(var(--spacing-md) * -1);
   margin-top: var(--spacing-2xl);
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.pdf-button {
+  width: 100%;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  padding: var(--spacing-lg);
+  min-height: 56px;
+  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+}
+
+.pdf-button:hover:not(:disabled) {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+}
+
+.pdf-button:disabled {
+  background: var(--gray-300);
+  color: var(--gray-500);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .submit-button {
@@ -145,6 +181,12 @@
   .submit-section {
     border-radius: var(--radius-lg);
     margin: var(--spacing-2xl) 0;
+    flex-direction: row;
+  }
+
+  .pdf-button,
+  .submit-button {
+    flex: 1;
   }
 }
 
