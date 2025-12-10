@@ -6,22 +6,24 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo) ← REUSED
- *     ├── "2025-12-10" (First report)
+ * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo) ← ALWAYS REUSED
+ *     ├── "2025-12-10" (First report - all files together)
  *     │   ├── الصور الرئيسية/
+ *     │   │   ├── photo1.jpg
+ *     │   │   └── photo2.jpg
  *     │   ├── ملفات البلاغ/
+ *     │   │   └── report.pdf
  *     │   └── Finding1 - broken door/
- *     ├── "2025-12-10 (2nd)" (Second report - NEW folder)
- *     │   ├── الصور الرئيسية/
- *     │   └── ملفات البلاغ/
- *     └── "2025-12-10 (3rd)" (Third report - NEW folder)
- *         └── الصور الرئيسية/
+ *     │       └── finding.jpg
+ *     └── "2025-12-10 (2nd)" (Second report - when newSession=true)
+ *         ├── الصور الرئيسية/
+ *         └── ملفات البلاغ/
  *
  * How it works:
  * - Building/Property folder: ALWAYS REUSED
- * - Date folders: NEVER REUSED - each upload creates new versioned folder
- * - If "2025-12-10" exists → creates "2025-12-10 (2nd)" automatically
- * - EACH UPLOAD = NEW DATE FOLDER (prevents overwriting old reports)
+ * - Date folders: REUSED by default (all files for same report go together)
+ * - When newSession=true: Creates "2025-12-10 (2nd)" for NEW report
+ * - ONE REPORT = ONE DATE FOLDER (all files together)
  */
 
 /**
@@ -163,15 +165,16 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // ALWAYS check for existing date folders and create versioned folder
-  // NEVER reuse date folders - each report gets its own dated folder
-  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+  let dateFolderId;
 
-  if (versionedDate.version === 1) {
-    console.log(`   📅 First report today: ${versionedDate.name}`);
+  if (newSession) {
+    // NEW report: Create versioned folder
+    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+    console.log(`   📅 New report: ${versionedDate.name} (report #${versionedDate.version} today)`);
   } else {
-    console.log(`   📅 New report: ${versionedDate.name} (${versionedDate.version} reports today)`);
+    // SAME report: Reuse existing date folder
+    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
   }
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
@@ -276,14 +279,20 @@ export async function uploadMultipleFiles(files, propertyCode, propertyType, end
     const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
     const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-    // Get versioned date folder ONCE for ALL files
-    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-    const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+    // Get date folder ONCE for ALL files
+    let dateFolderId;
+    let folderDisplayName;
 
-    if (versionedDate.version === 1) {
-      console.log(`   📅 First report today: ${versionedDate.name}`);
+    if (newSession) {
+      // NEW report: Create versioned folder
+      const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+      dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+      folderDisplayName = versionedDate.name;
+      console.log(`   📅 New report: ${versionedDate.name} (report #${versionedDate.version} today)`);
     } else {
-      console.log(`   📅 New report: ${versionedDate.name} (${versionedDate.version} reports today)`);
+      // SAME report: Reuse existing date folder
+      dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+      folderDisplayName = today;
     }
 
     // Get subfolder ONCE for ALL files
@@ -323,7 +332,7 @@ export async function uploadMultipleFiles(files, propertyCode, propertyType, end
     });
 
     const results = await Promise.all(uploadPromises);
-    console.log(`   ✓ All ${results.length} files uploaded to ${versionedDate.name}/${subfolder}`);
+    console.log(`   ✓ All ${results.length} files uploaded to ${folderDisplayName}/${subfolder}`);
     return results;
   } catch (error) {
     console.error(`   ❌ Error during batch upload: ${error.message}`);
