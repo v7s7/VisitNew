@@ -6,7 +6,7 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── "843 + سكني + الفقراء والمساكين" (Code + PropertyType + EndowedTo)
+ * └── "843, سكني, الفقراء والمساكين" (Code, PropertyType, EndowedTo)
  *     └── "2024-01-15" (Date)
  *         ├── الصور الرئيسية/ (Main Photos)
  *         │   ├── photo1.jpg
@@ -63,20 +63,20 @@ function sanitizeFolderName(name) {
 
 /**
  * Get organized folder path for uploads
- * Creates: MainFolder/[Code + PropertyType + EndowedTo]/Date/subfolder
+ * Creates: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
  */
 async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية') {
   const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Create: MainFolder/[Code + PropertyType + EndowedTo]
-  const propertyFolderName = sanitizeFolderName(`${propertyCode} + ${propertyType} + ${endowedTo}`);
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]
+  const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create: MainFolder/[Code + PropertyType + EndowedTo]/Date
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date
   const dateFolderId = await getOrCreateFolder(propertyFolderId, today);
 
-  // Create: MainFolder/[Code + PropertyType + EndowedTo]/Date/subfolder
+  // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
   const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
 
   return subFolderId;

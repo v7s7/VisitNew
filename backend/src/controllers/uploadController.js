@@ -45,7 +45,7 @@ export async function uploadFileHandler(req, res) {
     );
 
     console.log(`📤 Uploaded: ${file.originalname} → ${result.fileName}`);
-    console.log(`   Property: ${propertyCode} + ${propertyType} + ${endowedTo} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
+    console.log(`   Property: ${propertyCode}, ${propertyType}, ${endowedTo} | Subfolder: ${subfolder || 'الصور الرئيسية'}`);
 
     res.json({
       success: true,
@@ -93,7 +93,7 @@ export async function uploadMultipleFilesHandler(req, res) {
       subfolder || 'الصور الرئيسية'
     );
 
-    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode} + ${propertyType} + ${endowedTo}`);
+    console.log(`📤 Uploaded ${results.length} files for property ${propertyCode}, ${propertyType}, ${endowedTo}`);
 
     res.json({
       success: true,
