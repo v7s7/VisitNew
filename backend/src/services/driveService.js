@@ -6,25 +6,22 @@ import { Readable } from 'stream';
  * Folder Structure in Google Drive:
  *
  * Main Folder (GOOGLE_DRIVE_FOLDER_ID)
- * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo)
+ * └── "315, محل تجاري, " (Code, PropertyType, EndowedTo) ← REUSED
  *     ├── "2025-12-10" (First report)
  *     │   ├── الصور الرئيسية/
- *     │   │   ├── photo1.jpg
- *     │   │   └── photo2.jpg
  *     │   ├── ملفات البلاغ/
- *     │   │   └── report.pdf
  *     │   └── Finding1 - broken door/
- *     │       └── finding.jpg
- *     └── "2025-12-10 (2nd)" (Second report - same day)
- *         ├── الصور الرئيسية/
- *         │   └── photo3.jpg
- *         └── ملفات البلاغ/
- *             └── report2.pdf
+ *     ├── "2025-12-10 (2nd)" (Second report - NEW folder)
+ *     │   ├── الصور الرئيسية/
+ *     │   └── ملفات البلاغ/
+ *     └── "2025-12-10 (3rd)" (Third report - NEW folder)
+ *         └── الصور الرئيسية/
  *
- * How versioning works:
- * - Same report: All files go to same date folder (newSession=false, default)
- * - New report: Creates versioned folder "2025-12-10 (2nd)" (newSession=true)
- * - EACH REPORT = ONE DATE FOLDER
+ * How it works:
+ * - Building/Property folder: ALWAYS REUSED
+ * - Date folders: NEVER REUSED - each upload creates new versioned folder
+ * - If "2025-12-10" exists → creates "2025-12-10 (2nd)" automatically
+ * - EACH UPLOAD = NEW DATE FOLDER (prevents overwriting old reports)
  */
 
 /**
@@ -166,16 +163,15 @@ async function getOrganizedFolderPath(propertyCode, propertyType, endowedTo, sub
   const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
   const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
-  // Create date folder - version only if newSession=true
-  let dateFolderId;
-  if (newSession) {
-    // Create new versioned folder for new report submission
-    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
-    dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
-    console.log(`   📅 New report: Created ${versionedDate.name} (report #${versionedDate.version} today)`);
+  // ALWAYS check for existing date folders and create versioned folder
+  // NEVER reuse date folders - each report gets its own dated folder
+  const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+  const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+
+  if (versionedDate.version === 1) {
+    console.log(`   📅 First report today: ${versionedDate.name}`);
   } else {
-    // Reuse existing date folder for same report
-    dateFolderId = await getOrCreateFolder(propertyFolderId, today);
+    console.log(`   📅 New report: ${versionedDate.name} (${versionedDate.version} reports today)`);
   }
 
   // Create: MainFolder/[Code, PropertyType, EndowedTo]/Date/subfolder
