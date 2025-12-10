@@ -24,8 +24,11 @@ import { Readable } from 'stream';
 async function getOrCreateFolder(parentFolderId, folderName) {
   const drive = await getDriveClient();
 
+  // Escape single quotes in folder name for query
+  const escapedFolderName = folderName.replace(/'/g, "\\'");
+
   // Search for existing folder
-  const query = `name='${folderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const query = `name='${escapedFolderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const searchResponse = await drive.files.list({
     q: query,
@@ -34,11 +37,13 @@ async function getOrCreateFolder(parentFolderId, folderName) {
   });
 
   if (searchResponse.data.files && searchResponse.data.files.length > 0) {
-    // Folder exists
+    // Folder exists - reuse it
+    console.log(`   ♻️  Reusing existing folder: ${folderName}`);
     return searchResponse.data.files[0].id;
   }
 
   // Create new folder
+  console.log(`   📁 Creating new folder: ${folderName}`);
   const folderMetadata = {
     name: folderName,
     mimeType: 'application/vnd.google-apps.folder',
