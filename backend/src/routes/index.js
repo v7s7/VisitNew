@@ -14,11 +14,33 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Accept images only
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
+    const subfolder = req.body.subfolder;
+
+    // For "ملفات البلاغ" (Report Files), allow documents and images
+    if (subfolder === 'ملفات البلاغ') {
+      const allowedMimeTypes = [
+        'image/',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain'
+      ];
+
+      const isAllowed = allowedMimeTypes.some(type => file.mimetype.startsWith(type) || file.mimetype === type);
+      if (isAllowed) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only images, PDFs, Word documents, Excel files, and text files are allowed'), false);
+      }
     } else {
-      cb(new Error('Only image files are allowed'), false);
+      // For other subfolders (photos), accept images only
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'), false);
+      }
     }
   }
 });
