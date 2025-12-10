@@ -264,17 +264,66 @@ export async function uploadFile(fileBuffer, fileName, mimeType, propertyCode, p
 
 /**
  * Upload multiple files
- * @param {boolean} newSession - If true, creates new versioned date folder for all files
+ * All files go to the SAME versioned date folder
  */
 export async function uploadMultipleFiles(files, propertyCode, propertyType, endowedTo, subfolder = 'الصور الرئيسية', newSession = false) {
-  const uploadPromises = files.map((file, index) => {
-    console.log(`   [${index + 1}/${files.length}] Queuing: ${file.originalname}`);
-    return uploadFile(file.buffer, file.originalname, file.mimetype, propertyCode, propertyType, endowedTo, subfolder, newSession);
-  });
-
   try {
+    const drive = await getDriveClient();
+    const mainFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    // Get property folder (reused)
+    const propertyFolderName = sanitizeFolderName(`${propertyCode}, ${propertyType}, ${endowedTo}`);
+    const propertyFolderId = await getOrCreateFolder(mainFolderId, propertyFolderName);
+
+    // Get versioned date folder ONCE for ALL files
+    const versionedDate = await getNextVersionedFolderName(propertyFolderId, today);
+    const dateFolderId = await getOrCreateFolder(propertyFolderId, versionedDate.name, false);
+
+    if (versionedDate.version === 1) {
+      console.log(`   📅 First report today: ${versionedDate.name}`);
+    } else {
+      console.log(`   📅 New report: ${versionedDate.name} (${versionedDate.version} reports today)`);
+    }
+
+    // Get subfolder ONCE for ALL files
+    const subFolderId = await getOrCreateFolder(dateFolderId, subfolder);
+
+    // Upload ALL files to the SAME folder
+    const uploadPromises = files.map(async (file, index) => {
+      console.log(`   [${index + 1}/${files.length}] Uploading: ${file.originalname}`);
+
+      const bufferStream = Readable.from(file.buffer);
+      const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9._\u0600-\u06FF\s-]/g, '_');
+
+      const fileMetadata = {
+        name: sanitizedFileName,
+        parents: [subFolderId]
+      };
+
+      const media = {
+        mimeType: file.mimetype,
+        body: bufferStream
+      };
+
+      const response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id, name, webViewLink, webContentLink'
+      });
+
+      console.log(`   ✓ [${index + 1}/${files.length}] ${sanitizedFileName} uploaded`);
+
+      return {
+        fileId: response.data.id,
+        fileName: sanitizedFileName,
+        url: response.data.webViewLink || `https://drive.google.com/file/d/${response.data.id}/view`,
+        downloadUrl: response.data.webContentLink
+      };
+    });
+
     const results = await Promise.all(uploadPromises);
-    console.log(`   ✓ All ${results.length} files uploaded successfully`);
+    console.log(`   ✓ All ${results.length} files uploaded to ${versionedDate.name}/${subfolder}`);
     return results;
   } catch (error) {
     console.error(`   ❌ Error during batch upload: ${error.message}`);
