@@ -15,10 +15,7 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
         <h1 className="pdf-title">تقرير معاينة العقار</h1>
         <h2 className="pdf-subtitle">Property Inspection Report</h2>
         <div className="pdf-metadata">
-          <div>التاريخ | Date: {generatedDate}</div>
-          {report.inspectorName && (
-            <div>المفتش | Inspector: {report.inspectorName}</div>
-          )}
+          <div>{generatedDate}</div>
         </div>
       </div>
 
