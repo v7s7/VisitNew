@@ -140,10 +140,7 @@ export function validateReportForPdf(report: PropertyReport | null): string | nu
     return 'يرجى اختيار عقار أولاً | Please select a property first';
   }
 
-  if (!report.propertyCode || !report.propertyName) {
-    return 'يرجى اختيار عقار صحيح | Please select a valid property';
-  }
-
-  // All other fields are optional - PDF will show whatever is available
+  // All fields are optional - PDF will show whatever is available
+  // No validation errors - always allow PDF generation if property is selected
   return null;
 }
