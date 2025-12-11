@@ -109,13 +109,13 @@
   gap: var(--spacing-md);
 }
 
-.pdf-button {
+.pdf-button,
+.zip-button {
   width: 100%;
   font-size: var(--text-lg);
   font-weight: 600;
   padding: var(--spacing-lg);
   min-height: 56px;
-  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -128,6 +128,10 @@
   gap: var(--spacing-md);
 }
 
+.pdf-button {
+  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+}
+
 .pdf-button:hover:not(:disabled) {
   box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
@@ -135,6 +139,24 @@
 }
 
 .pdf-button:disabled {
+  background: var(--gray-300);
+  color: var(--gray-500);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.zip-button {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+}
+
+.zip-button:hover:not(:disabled) {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.zip-button:disabled {
   background: var(--gray-300);
   color: var(--gray-500);
   cursor: not-allowed;
@@ -185,6 +207,7 @@
   }
 
   .pdf-button,
+  .zip-button,
   .submit-button {
     flex: 1;
   }

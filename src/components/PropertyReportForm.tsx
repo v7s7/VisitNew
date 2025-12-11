@@ -3,6 +3,7 @@ import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile
 import { submitReport, uploadFile } from '../api';
 import { isValidUrl } from '../utils';
 import { printReport, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
+import { downloadReportZip, validateReportForZip } from '../zipUtils';
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
 import ComplaintFileUpload from './ComplaintFileUpload';
@@ -40,6 +41,8 @@ export default function PropertyReportForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [zipError, setZipError] = useState<string | null>(null);
 
   // Auto-fill fields when property is selected
   const handlePropertySelect = (property: Property | null) => {
@@ -301,8 +304,63 @@ export default function PropertyReportForm() {
     }
   };
 
+  const handleDownloadZip = async () => {
+    if (!selectedProperty) return;
+
+    // Build current report object from form state
+    const currentReport: PropertyReport = {
+      propertyId: selectedProperty.id,
+      propertyCode: selectedProperty.code,
+      propertyName: selectedProperty.name,
+      waqfType: formData.waqfType,
+      propertyType: formData.propertyType,
+      endowedTo: formData.endowedTo,
+      building: formData.building,
+      unitNumber: formData.unitNumber,
+      road: formData.road,
+      area: formData.area,
+      governorate: formData.governorate,
+      block: formData.block,
+      locationDescription: formData.locationDescription,
+      locationLink: formData.locationLink,
+      mainPhotos: mainPhotos,
+      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+      additionalNotes: formData.additionalNotes || undefined,
+      visitType: formData.visitType,
+      complaint: formData.complaint,
+      complaintFiles: complaintFiles,
+      findings: findings,
+      actions: actions,
+      corrector: formData.corrector || undefined,
+    };
+
+    // Validate report has files
+    const validationError = validateReportForZip(currentReport);
+    if (validationError) {
+      setZipError(validationError);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsDownloadingZip(true);
+    setZipError(null);
+
+    try {
+      await downloadReportZip(currentReport);
+      // ZIP downloaded successfully
+    } catch (error: any) {
+      console.error('ZIP download error:', error);
+      setZipError(error.message || 'فشل تحميل الملف. حاول مرة أخرى. | Failed to download ZIP. Try again.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
+
   const isFormDisabled = !selectedProperty;
   const isPrintButtonDisabled = !selectedProperty;
+  const isZipButtonDisabled = !selectedProperty || isDownloadingZip;
 
   // Build current report for PDF preview
   const currentReportForPdf: PropertyReport | null = selectedProperty
@@ -350,6 +408,12 @@ export default function PropertyReportForm() {
       {pdfError && (
         <div className="alert alert-error" role="alert">
           {pdfError}
+        </div>
+      )}
+
+      {zipError && (
+        <div className="alert alert-error" role="alert">
+          {zipError}
         </div>
       )}
 
@@ -625,7 +689,7 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Submit and Print Buttons */}
+          {/* Action Buttons */}
           <div className="submit-section">
             <button
               type="button"
@@ -638,17 +702,19 @@ export default function PropertyReportForm() {
             </button>
 
             <button
-              type="submit"
-              className="submit-button"
-              disabled={isSubmitting || isFormDisabled}
+              type="button"
+              className="zip-button"
+              onClick={handleDownloadZip}
+              disabled={isZipButtonDisabled}
+              title="تحميل جميع الملفات | Download All Files"
             >
-              {isSubmitting ? (
+              {isDownloadingZip ? (
                 <>
                   <span className="loading"></span>
-                  <span>جاري الإرسال...</span>
+                  <span>جاري التحميل...</span>
                 </>
               ) : (
-                'إرسال التقرير | Submit Report'
+                '📦 تحميل ZIP / Download ZIP'
               )}
             </button>
           </div>
