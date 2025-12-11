@@ -99,16 +99,46 @@ export async function generateReportPdf(
 
   const filename = generatePdfFilename(report);
 
+  // Make element visible for rendering
+  const container = element.parentElement;
+  if (container) {
+    container.style.position = 'fixed';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.width = '210mm';
+    container.style.zIndex = '-1';
+    container.style.opacity = '0';
+    container.style.pointerEvents = 'none';
+  }
+
+  // Wait for images to load
+  const images = element.getElementsByTagName('img');
+  const imagePromises = Array.from(images).map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve; // Continue even if image fails
+      setTimeout(resolve, 3000); // Timeout after 3 seconds
+    });
+  });
+
+  await Promise.all(imagePromises);
+
   // Configure html2pdf options
   const options = {
     margin: [10, 10, 10, 10], // [top, right, bottom, left] in mm
     filename: filename,
-    image: { type: 'jpeg', quality: 0.85 },
+    image: {
+      type: 'jpeg',
+      quality: 0.95
+    },
     html2canvas: {
       scale: 2,
       useCORS: true,
       logging: false,
       letterRendering: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
     },
     jsPDF: {
       unit: 'mm',
@@ -118,6 +148,7 @@ export async function generateReportPdf(
     },
     pagebreak: {
       mode: ['avoid-all', 'css', 'legacy'],
+      before: '.pdf-section',
     },
   };
 
@@ -127,6 +158,16 @@ export async function generateReportPdf(
   } catch (error) {
     console.error('PDF generation error:', error);
     throw new Error('Failed to generate PDF. Please try again.');
+  } finally {
+    // Hide element again
+    if (container) {
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.zIndex = '';
+      container.style.opacity = '';
+      container.style.pointerEvents = '';
+    }
   }
 }
 
