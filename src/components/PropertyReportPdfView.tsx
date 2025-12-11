@@ -28,48 +28,66 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
         <div className="pdf-field-grid">
           <div className="pdf-field">
             <span className="pdf-label">الرمز | Code:</span>
-            <span className="pdf-value">{report.propertyCode}</span>
+            <span className="pdf-value">{report.propertyCode || '-'}</span>
           </div>
           <div className="pdf-field">
             <span className="pdf-label">الاسم | Name:</span>
-            <span className="pdf-value">{report.propertyName}</span>
+            <span className="pdf-value">{report.propertyName || '-'}</span>
           </div>
-          <div className="pdf-field">
-            <span className="pdf-label">نوع الوقف | Waqf Type:</span>
-            <span className="pdf-value">{report.waqfType}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">نوع العقار | Property Type:</span>
-            <span className="pdf-value">{report.propertyType}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">موقوف على | Endowed To:</span>
-            <span className="pdf-value">{report.endowedTo}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">مبنى | Building:</span>
-            <span className="pdf-value">{report.building}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">رقم الوحدة | Unit Number:</span>
-            <span className="pdf-value">{report.unitNumber}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">الطريق | Road:</span>
-            <span className="pdf-value">{report.road}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">المنطقة | Area:</span>
-            <span className="pdf-value">{report.area}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">المحافظة | Governorate:</span>
-            <span className="pdf-value">{report.governorate}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">المجمع | Complex:</span>
-            <span className="pdf-value">{report.block}</span>
-          </div>
+          {report.waqfType && (
+            <div className="pdf-field">
+              <span className="pdf-label">نوع الوقف | Waqf Type:</span>
+              <span className="pdf-value">{report.waqfType}</span>
+            </div>
+          )}
+          {report.propertyType && (
+            <div className="pdf-field">
+              <span className="pdf-label">نوع العقار | Property Type:</span>
+              <span className="pdf-value">{report.propertyType}</span>
+            </div>
+          )}
+          {report.endowedTo && (
+            <div className="pdf-field">
+              <span className="pdf-label">موقوف على | Endowed To:</span>
+              <span className="pdf-value">{report.endowedTo}</span>
+            </div>
+          )}
+          {report.building && (
+            <div className="pdf-field">
+              <span className="pdf-label">مبنى | Building:</span>
+              <span className="pdf-value">{report.building}</span>
+            </div>
+          )}
+          {report.unitNumber && (
+            <div className="pdf-field">
+              <span className="pdf-label">رقم الوحدة | Unit Number:</span>
+              <span className="pdf-value">{report.unitNumber}</span>
+            </div>
+          )}
+          {report.road && (
+            <div className="pdf-field">
+              <span className="pdf-label">الطريق | Road:</span>
+              <span className="pdf-value">{report.road}</span>
+            </div>
+          )}
+          {report.area && (
+            <div className="pdf-field">
+              <span className="pdf-label">المنطقة | Area:</span>
+              <span className="pdf-value">{report.area}</span>
+            </div>
+          )}
+          {report.governorate && (
+            <div className="pdf-field">
+              <span className="pdf-label">المحافظة | Governorate:</span>
+              <span className="pdf-value">{report.governorate}</span>
+            </div>
+          )}
+          {report.block && (
+            <div className="pdf-field">
+              <span className="pdf-label">المجمع | Complex:</span>
+              <span className="pdf-value">{report.block}</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -120,21 +138,23 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
       )}
 
       {/* Visit Information */}
-      <section className="pdf-section">
-        <h3 className="pdf-section-title">معلومات الزيارة | Visit Information</h3>
-        <div className="pdf-field">
-          <span className="pdf-label">نوع الزيارة | Visit Type:</span>
-          <span className="pdf-value">
-            {report.visitType === 'routine' ? 'زيارة دورية | Routine Visit' : 'بلاغ | Complaint'}
-          </span>
-        </div>
-        {report.complaint && (
+      {report.visitType && (
+        <section className="pdf-section">
+          <h3 className="pdf-section-title">معلومات الزيارة | Visit Information</h3>
           <div className="pdf-field">
-            <span className="pdf-label">تفاصيل البلاغ | Complaint Details:</span>
-            <span className="pdf-value">{report.complaint}</span>
+            <span className="pdf-label">نوع الزيارة | Visit Type:</span>
+            <span className="pdf-value">
+              {report.visitType === 'routine' ? 'زيارة دورية | Routine Visit' : 'بلاغ | Complaint'}
+            </span>
           </div>
-        )}
-      </section>
+          {report.complaint && (
+            <div className="pdf-field">
+              <span className="pdf-label">تفاصيل البلاغ | Complaint Details:</span>
+              <span className="pdf-value">{report.complaint}</span>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Main Photos */}
       {report.mainPhotos.length > 0 && (

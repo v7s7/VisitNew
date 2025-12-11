@@ -306,7 +306,7 @@ export default function PropertyReportForm() {
   };
 
   const isFormDisabled = !selectedProperty;
-  const isPdfButtonDisabled = !selectedProperty || !formData.visitType || isGeneratingPdf;
+  const isPdfButtonDisabled = !selectedProperty || isGeneratingPdf;
 
   // Build current report for PDF preview
   const currentReportForPdf: PropertyReport | null = selectedProperty

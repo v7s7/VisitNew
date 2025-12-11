@@ -137,16 +137,13 @@ export async function generateReportPdf(
  */
 export function validateReportForPdf(report: PropertyReport | null): string | null {
   if (!report) {
-    return 'No report data available';
+    return 'يرجى اختيار عقار أولاً | Please select a property first';
   }
 
   if (!report.propertyCode || !report.propertyName) {
-    return 'Property code and name are required';
+    return 'يرجى اختيار عقار صحيح | Please select a valid property';
   }
 
-  if (!report.visitType) {
-    return 'Visit type is required';
-  }
-
+  // All other fields are optional - PDF will show whatever is available
   return null;
 }
