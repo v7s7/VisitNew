@@ -226,15 +226,21 @@ label:has(+ textarea[required])::after {
   font-weight: bold;
 }
 
+/* Hide PDF content on screen */
+.pdf-content-hidden {
+  display: none;
+}
+
 /* Print styles - hide form, show PDF view */
 @media print {
-  .property-report-form > *:not(#pdf-content) {
+  /* Hide everything except PDF content */
+  .property-report-form > *:not(.pdf-content-hidden) {
     display: none !important;
   }
 
-  #pdf-content {
-    position: static !important;
-    left: auto !important;
+  /* Show PDF content */
+  .pdf-content-hidden {
     display: block !important;
+    position: static !important;
   }
 }

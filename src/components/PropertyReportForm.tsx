@@ -723,14 +723,7 @@ export default function PropertyReportForm() {
 
       {/* Hidden PDF View for Generation */}
       {currentReportForPdf && (
-        <div
-          id="pdf-content"
-          style={{
-            position: 'absolute',
-            left: '-9999px',
-            top: 0,
-          }}
-        >
+        <div id="pdf-content" className="pdf-content-hidden">
           <PropertyReportPdfView
             report={currentReportForPdf}
             generatedDate={formatBahrainDate()}
