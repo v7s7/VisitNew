@@ -1,7 +1,6 @@
 import JSZip from 'jszip';
-import html2pdf from 'html2pdf.js';
 import { PropertyReport } from './types';
-import { sanitizeFilename, getBahrainDateString, generatePdfFilename, formatBahrainDate } from './pdfUtils';
+import { sanitizeFilename, getBahrainDateString } from './pdfUtils';
 
 /**
  * Fetch file from URL or File object and return as blob
@@ -36,66 +35,12 @@ function getFileExtension(file: File): string {
 }
 
 /**
- * Generate PDF blob from report
- */
-async function generatePdfBlob(report: PropertyReport): Promise<Blob> {
-  // Get the PDF content element
-  const element = document.getElementById('pdf-content');
-  if (!element) {
-    throw new Error('PDF content element not found');
-  }
-
-  const pdfFilename = generatePdfFilename(report);
-
-  const options = {
-    margin: [10, 10, 10, 10],
-    filename: pdfFilename,
-    image: {
-      type: 'jpeg',
-      quality: 0.95
-    },
-    html2canvas: {
-      scale: 2,
-      useCORS: false,
-      logging: false,
-      letterRendering: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      windowWidth: 794,
-      windowHeight: 1123,
-    },
-    jsPDF: {
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait',
-    },
-  };
-
-  // Generate PDF and return as blob
-  const pdf = await html2pdf().set(options).from(element).output('blob');
-  return pdf;
-}
-
-/**
  * Download all uploaded files from a property report as a ZIP file
  * @param report - Property report containing uploaded files
  */
 export async function downloadReportZip(report: PropertyReport): Promise<void> {
   const zip = new JSZip();
   let fileCount = 0;
-
-  // Generate and add PDF report
-  try {
-    console.log('📄 Generating PDF for ZIP...');
-    const pdfBlob = await generatePdfBlob(report);
-    const pdfFilename = generatePdfFilename(report);
-    zip.file(pdfFilename, pdfBlob);
-    fileCount++;
-    console.log('✓ PDF added to ZIP');
-  } catch (error) {
-    console.error('Failed to generate PDF for ZIP:', error);
-    // Continue even if PDF generation fails
-  }
 
   // Add main photos
   if (report.mainPhotos.length > 0) {
