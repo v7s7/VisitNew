@@ -91,42 +91,77 @@ export async function generateReportPdf(
   report: PropertyReport,
   elementId: string = 'pdf-content'
 ): Promise<void> {
-  const element = document.getElementById(elementId);
+  console.log('🔍 Starting PDF generation...');
+  const element = document.getElementById(elementId) as HTMLElement;
 
   if (!element) {
+    console.error('❌ Element not found:', elementId);
     throw new Error(`Element with ID "${elementId}" not found`);
   }
 
+  console.log('✓ Element found');
+  console.log('📄 Element HTML length:', element.innerHTML.length);
+
   const filename = generatePdfFilename(report);
+  console.log('📝 Filename:', filename);
+
+  // Store original styles
+  const originalStyles = {
+    position: element.style.position,
+    left: element.style.left,
+    top: element.style.top,
+    width: element.style.width,
+    zIndex: element.style.zIndex,
+    visibility: element.style.visibility,
+  };
 
   // Make element visible for rendering
-  const container = element.parentElement;
-  if (container) {
-    container.style.position = 'fixed';
-    container.style.left = '0';
-    container.style.top = '0';
-    container.style.width = '210mm';
-    container.style.zIndex = '-1';
-    container.style.opacity = '0';
-    container.style.pointerEvents = 'none';
-  }
+  element.style.position = 'fixed';
+  element.style.left = '0';
+  element.style.top = '0';
+  element.style.width = '210mm';
+  element.style.zIndex = '9999';
+  element.style.visibility = 'visible';
+  console.log('✓ Element made visible');
+
+  // Give browser time to render
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   // Wait for images to load
   const images = element.getElementsByTagName('img');
-  const imagePromises = Array.from(images).map((img) => {
-    if (img.complete) return Promise.resolve();
+  console.log('🖼️ Found', images.length, 'images');
+
+  const imagePromises = Array.from(images).map((img, index) => {
+    if (img.complete && img.naturalHeight !== 0) {
+      console.log(`✓ Image ${index + 1} already loaded`);
+      return Promise.resolve();
+    }
+    console.log(`⏳ Waiting for image ${index + 1} to load...`);
     return new Promise((resolve) => {
-      img.onload = resolve;
-      img.onerror = resolve; // Continue even if image fails
-      setTimeout(resolve, 3000); // Timeout after 3 seconds
+      img.onload = () => {
+        console.log(`✓ Image ${index + 1} loaded`);
+        resolve(null);
+      };
+      img.onerror = () => {
+        console.log(`⚠️ Image ${index + 1} failed to load`);
+        resolve(null);
+      };
+      setTimeout(() => {
+        console.log(`⏱️ Image ${index + 1} timeout`);
+        resolve(null);
+      }, 5000);
     });
   });
 
   await Promise.all(imagePromises);
+  console.log('✓ All images processed');
+
+  // Additional delay to ensure everything is rendered
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   // Configure html2pdf options
   const options = {
-    margin: [10, 10, 10, 10], // [top, right, bottom, left] in mm
+    margin: [10, 10, 10, 10],
     filename: filename,
     image: {
       type: 'jpeg',
@@ -134,40 +169,39 @@ export async function generateReportPdf(
     },
     html2canvas: {
       scale: 2,
-      useCORS: true,
-      logging: false,
+      logging: true,
       letterRendering: true,
-      allowTaint: true,
+      allowTaint: false,
+      useCORS: false,
       backgroundColor: '#ffffff',
+      windowWidth: 794, // A4 width in pixels at 96 DPI
+      windowHeight: 1123, // A4 height in pixels at 96 DPI
     },
     jsPDF: {
       unit: 'mm',
       format: 'a4',
       orientation: 'portrait',
-      compress: true,
-    },
-    pagebreak: {
-      mode: ['avoid-all', 'css', 'legacy'],
-      before: '.pdf-section',
     },
   };
+
+  console.log('⚙️ Starting html2pdf conversion...');
 
   // Generate and download PDF
   try {
     await html2pdf().set(options).from(element).save();
+    console.log('✅ PDF generated successfully!');
   } catch (error) {
-    console.error('PDF generation error:', error);
+    console.error('❌ PDF generation error:', error);
     throw new Error('Failed to generate PDF. Please try again.');
   } finally {
-    // Hide element again
-    if (container) {
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.zIndex = '';
-      container.style.opacity = '';
-      container.style.pointerEvents = '';
-    }
+    // Restore original styles
+    element.style.position = originalStyles.position;
+    element.style.left = originalStyles.left;
+    element.style.top = originalStyles.top;
+    element.style.width = originalStyles.width;
+    element.style.zIndex = originalStyles.zIndex;
+    element.style.visibility = originalStyles.visibility;
+    console.log('✓ Element hidden again');
   }
 }
 
