@@ -1,4 +1,3 @@
-import html2pdf from 'html2pdf.js';
 import { PropertyReport } from './types';
 
 /**
@@ -82,126 +81,27 @@ export function generatePdfFilename(report: PropertyReport): string {
 }
 
 /**
- * Generate and download PDF from a report
- * @param report - Property report to generate PDF from
- * @param elementId - ID of the HTML element to convert to PDF
- * @returns Promise that resolves when PDF generation is complete
+ * Print report (user can save as PDF from browser's print dialog)
+ * @param report - Property report to print
+ * @returns Promise that resolves when print dialog is opened
  */
-export async function generateReportPdf(
-  report: PropertyReport,
-  elementId: string = 'pdf-content'
-): Promise<void> {
-  console.log('🔍 Starting PDF generation...');
-  const element = document.getElementById(elementId) as HTMLElement;
+export async function printReport(report: PropertyReport): Promise<void> {
+  console.log('🖨️ Opening print dialog...');
 
-  if (!element) {
-    console.error('❌ Element not found:', elementId);
-    throw new Error(`Element with ID "${elementId}" not found`);
-  }
-
-  console.log('✓ Element found');
-  console.log('📄 Element HTML length:', element.innerHTML.length);
-
+  // Set document title for PDF filename suggestion
   const filename = generatePdfFilename(report);
-  console.log('📝 Filename:', filename);
+  const originalTitle = document.title;
+  document.title = filename;
 
-  // Store original styles
-  const originalStyles = {
-    position: element.style.position,
-    left: element.style.left,
-    top: element.style.top,
-    width: element.style.width,
-    zIndex: element.style.zIndex,
-    visibility: element.style.visibility,
-  };
-
-  // Make element visible for rendering
-  element.style.position = 'fixed';
-  element.style.left = '0';
-  element.style.top = '0';
-  element.style.width = '210mm';
-  element.style.zIndex = '9999';
-  element.style.visibility = 'visible';
-  console.log('✓ Element made visible');
-
-  // Give browser time to render
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  // Wait for images to load
-  const images = element.getElementsByTagName('img');
-  console.log('🖼️ Found', images.length, 'images');
-
-  const imagePromises = Array.from(images).map((img, index) => {
-    if (img.complete && img.naturalHeight !== 0) {
-      console.log(`✓ Image ${index + 1} already loaded`);
-      return Promise.resolve();
-    }
-    console.log(`⏳ Waiting for image ${index + 1} to load...`);
-    return new Promise((resolve) => {
-      img.onload = () => {
-        console.log(`✓ Image ${index + 1} loaded`);
-        resolve(null);
-      };
-      img.onerror = () => {
-        console.log(`⚠️ Image ${index + 1} failed to load`);
-        resolve(null);
-      };
-      setTimeout(() => {
-        console.log(`⏱️ Image ${index + 1} timeout`);
-        resolve(null);
-      }, 5000);
-    });
-  });
-
-  await Promise.all(imagePromises);
-  console.log('✓ All images processed');
-
-  // Additional delay to ensure everything is rendered
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Configure html2pdf options
-  const options = {
-    margin: [10, 10, 10, 10],
-    filename: filename,
-    image: {
-      type: 'jpeg',
-      quality: 0.95
-    },
-    html2canvas: {
-      scale: 2,
-      logging: true,
-      letterRendering: true,
-      allowTaint: false,
-      useCORS: false,
-      backgroundColor: '#ffffff',
-      windowWidth: 794, // A4 width in pixels at 96 DPI
-      windowHeight: 1123, // A4 height in pixels at 96 DPI
-    },
-    jsPDF: {
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait',
-    },
-  };
-
-  console.log('⚙️ Starting html2pdf conversion...');
-
-  // Generate and download PDF
   try {
-    await html2pdf().set(options).from(element).save();
-    console.log('✅ PDF generated successfully!');
-  } catch (error) {
-    console.error('❌ PDF generation error:', error);
-    throw new Error('Failed to generate PDF. Please try again.');
+    // Open browser's native print dialog
+    window.print();
+    console.log('✅ Print dialog opened');
   } finally {
-    // Restore original styles
-    element.style.position = originalStyles.position;
-    element.style.left = originalStyles.left;
-    element.style.top = originalStyles.top;
-    element.style.width = originalStyles.width;
-    element.style.zIndex = originalStyles.zIndex;
-    element.style.visibility = originalStyles.visibility;
-    console.log('✓ Element hidden again');
+    // Restore original title after a delay
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   }
 }
 

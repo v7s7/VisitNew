@@ -202,3 +202,16 @@ label:has(+ textarea[required])::after {
   color: var(--danger);
   font-weight: bold;
 }
+
+/* Print styles - hide form, show PDF view */
+@media print {
+  .property-report-form > *:not(#pdf-content) {
+    display: none !important;
+  }
+
+  #pdf-content {
+    position: static !important;
+    left: auto !important;
+    display: block !important;
+  }
+}

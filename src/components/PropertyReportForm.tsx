@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
 import { submitReport, uploadFile } from '../api';
 import { isValidUrl } from '../utils';
-import { generateReportPdf, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
+import { printReport, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
 import ComplaintFileUpload from './ComplaintFileUpload';
@@ -39,7 +39,6 @@ export default function PropertyReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Auto-fill fields when property is selected
@@ -251,7 +250,7 @@ export default function PropertyReportForm() {
     }
   };
 
-  const handleGeneratePdf = async () => {
+  const handlePrint = async () => {
     if (!selectedProperty) return;
 
     // Build current report object from form state
@@ -290,23 +289,20 @@ export default function PropertyReportForm() {
       return;
     }
 
-    setIsGeneratingPdf(true);
     setPdfError(null);
 
     try {
-      await generateReportPdf(currentReport, 'pdf-content');
-      // Success - PDF downloaded
+      await printReport(currentReport);
+      // Print dialog opened successfully
     } catch (error: any) {
-      console.error('PDF generation error:', error);
-      setPdfError(error.message || 'فشل إنشاء PDF. حاول مرة أخرى. | Failed to generate PDF. Try again.');
+      console.error('Print error:', error);
+      setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } finally {
-      setIsGeneratingPdf(false);
     }
   };
 
   const isFormDisabled = !selectedProperty;
-  const isPdfButtonDisabled = !selectedProperty || isGeneratingPdf;
+  const isPrintButtonDisabled = !selectedProperty;
 
   // Build current report for PDF preview
   const currentReportForPdf: PropertyReport | null = selectedProperty
@@ -629,23 +625,16 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Submit and PDF Buttons */}
+          {/* Submit and Print Buttons */}
           <div className="submit-section">
             <button
               type="button"
               className="pdf-button"
-              onClick={handleGeneratePdf}
-              disabled={isPdfButtonDisabled}
-              title="حفظ كـ PDF / طباعة | Save as PDF / Print"
+              onClick={handlePrint}
+              disabled={isPrintButtonDisabled}
+              title="طباعة أو حفظ كـ PDF | Print or Save as PDF"
             >
-              {isGeneratingPdf ? (
-                <>
-                  <span className="loading"></span>
-                  <span>جاري إنشاء PDF...</span>
-                </>
-              ) : (
-                '📄 حفظ كـ PDF | Save as PDF'
-              )}
+              🖨️ طباعة / Print
             </button>
 
             <button
