@@ -23,14 +23,6 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
       <section className="pdf-section">
         <h3 className="pdf-section-title">بيانات العقار | Property Information</h3>
         <div className="pdf-field-grid">
-          <div className="pdf-field">
-            <span className="pdf-label">الرمز | Code:</span>
-            <span className="pdf-value">{report.propertyCode || '-'}</span>
-          </div>
-          <div className="pdf-field">
-            <span className="pdf-label">الاسم | Name:</span>
-            <span className="pdf-value">{report.propertyName || '-'}</span>
-          </div>
           {report.waqfType && (
             <div className="pdf-field">
               <span className="pdf-label">نوع الوقف | Waqf Type:</span>
@@ -134,25 +126,6 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
         </section>
       )}
 
-      {/* Visit Information */}
-      {report.visitType && (
-        <section className="pdf-section">
-          <h3 className="pdf-section-title">معلومات الزيارة | Visit Information</h3>
-          <div className="pdf-field">
-            <span className="pdf-label">نوع الزيارة | Visit Type:</span>
-            <span className="pdf-value">
-              {report.visitType === 'routine' ? 'زيارة دورية | Routine Visit' : 'بلاغ | Complaint'}
-            </span>
-          </div>
-          {report.complaint && (
-            <div className="pdf-field">
-              <span className="pdf-label">تفاصيل البلاغ | Complaint Details:</span>
-              <span className="pdf-value">{report.complaint}</span>
-            </div>
-          )}
-        </section>
-      )}
-
       {/* Main Photos */}
       {report.mainPhotos.length > 0 && (
         <section className="pdf-section">
@@ -185,27 +158,48 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
         </section>
       )}
 
-      {/* Complaint Files */}
-      {report.complaintFiles.length > 0 && (
+      {/* Visit Information */}
+      {report.visitType && (
         <section className="pdf-section">
-          <h3 className="pdf-section-title">ملفات البلاغ | Complaint Files</h3>
-          <div className="pdf-file-list">
-            {report.complaintFiles.map((file, index) => (
-              <div key={file.localId} className="pdf-file-item">
-                <span className="pdf-file-number">{index + 1}.</span>
-                {file.uploadedUrl ? (
-                  <a href={file.uploadedUrl} target="_blank" rel="noopener noreferrer" className="pdf-file-link">
-                    {file.name}
-                  </a>
-                ) : (
-                  <span className="pdf-file-name">{file.name}</span>
-                )}
-                <span className="pdf-file-info">
-                  ({file.type} • {formatFileSize(file.size)})
-                </span>
-              </div>
-            ))}
+          <h3 className="pdf-section-title">معلومات الزيارة | Visit Information</h3>
+          <div className="pdf-field">
+            <span className="pdf-label">نوع الزيارة | Visit Type:</span>
+            <span className="pdf-value">
+              {report.visitType === 'routine' ? 'زيارة دورية | Routine Visit' : 'بلاغ | Complaint'}
+            </span>
           </div>
+          {report.complaint && (
+            <div className="pdf-field">
+              <span className="pdf-label">تفاصيل البلاغ | Complaint Details:</span>
+              <span className="pdf-value">{report.complaint}</span>
+            </div>
+          )}
+
+          {/* Complaint Files inside Visit Information */}
+          {report.complaintFiles.length > 0 && (
+            <>
+              <div className="pdf-field" style={{ marginTop: '12px' }}>
+                <span className="pdf-label">ملفات البلاغ | Complaint Files:</span>
+              </div>
+              <div className="pdf-file-list">
+                {report.complaintFiles.map((file, index) => (
+                  <div key={file.localId} className="pdf-file-item">
+                    <span className="pdf-file-number">{index + 1}.</span>
+                    {file.uploadedUrl ? (
+                      <a href={file.uploadedUrl} target="_blank" rel="noopener noreferrer" className="pdf-file-link">
+                        {file.name}
+                      </a>
+                    ) : (
+                      <span className="pdf-file-name">{file.name}</span>
+                    )}
+                    <span className="pdf-file-info">
+                      ({file.type} • {formatFileSize(file.size)})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </section>
       )}
 
