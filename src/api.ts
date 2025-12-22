@@ -6,7 +6,11 @@ import {
   UploadResponse,
 } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// Normalize base URL to avoid double slashes and to support full URLs like:
+// https://visitprop.onrender.com
+// Also supports proxy-style base like "/api" for local/proxy setups.
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').trim();
+const API_BASE_URL = RAW_BASE.replace(/\/+$/, ''); // remove trailing "/"
 
 async function parseErrorMessage(response: Response): Promise<string> {
   let message = response.statusText;
@@ -19,6 +23,19 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return message;
 }
 
+function buildUrl(path: string): string {
+  const p = path.startsWith('/') ? path : `/${path}`;
+
+  // If base is "/api", then "/api" + "/properties" => "/api/properties"
+  // If base is "https://visitprop.onrender.com", we MUST hit "/api/..." routes on backend:
+  // "https://visitprop.onrender.com" + "/api/properties" => full URL
+  if (API_BASE_URL === '/api') return `${API_BASE_URL}${p}`;
+
+  // For full backend base URL, ensure we include /api prefix
+  const apiPath = p.startsWith('/api/') ? p : `/api${p}`;
+  return `${API_BASE_URL}${apiPath}`;
+}
+
 /**
  * Search for properties by name/code/area/governorate/postcode
  * GET /api/properties?search=<query>
@@ -28,7 +45,8 @@ export async function searchProperties(query: string): Promise<Property[]> {
   if (!q) return [];
 
   const response = await fetch(
-    `${API_BASE_URL}/properties?search=${encodeURIComponent(q)}`
+    buildUrl(`/properties?search=${encodeURIComponent(q)}`),
+    { credentials: 'include' }
   );
 
   if (!response.ok) {
@@ -62,9 +80,10 @@ export async function uploadFile(
   formData.append('endowedTo', endowedTo || '');
   if (subfolder) formData.append('subfolder', subfolder);
 
-  const response = await fetch(`${API_BASE_URL}/upload`, {
+  const response = await fetch(buildUrl('/upload'), {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -83,12 +102,13 @@ export async function uploadFile(
 export async function submitReport(
   report: PropertyReport
 ): Promise<ReportSubmitResponse> {
-  const response = await fetch(`${API_BASE_URL}/reports`, {
+  const response = await fetch(buildUrl('/reports'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(report),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -107,12 +127,16 @@ export async function submitReport(
 export async function generateReportExports(reportId: string): Promise<any> {
   if (!reportId) throw new Error('reportId is required');
 
-  const response = await fetch(`${API_BASE_URL}/reports/${encodeURIComponent(reportId)}/exports`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const response = await fetch(
+    buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    }
+  );
 
   if (!response.ok) {
     const message = await parseErrorMessage(response);
@@ -129,7 +153,10 @@ export async function generateReportExports(reportId: string): Promise<any> {
 export async function getReportExports(reportId: string): Promise<any> {
   if (!reportId) throw new Error('reportId is required');
 
-  const response = await fetch(`${API_BASE_URL}/reports/${encodeURIComponent(reportId)}/exports`);
+  const response = await fetch(
+    buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`),
+    { credentials: 'include' }
+  );
 
   if (!response.ok) {
     const message = await parseErrorMessage(response);
