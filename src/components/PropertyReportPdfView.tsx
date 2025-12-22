@@ -7,7 +7,28 @@ interface PropertyReportPdfViewProps {
   generatedDate: string;
 }
 
+function buildOneLineAddress(report: PropertyReport): string {
+  const name = (report.propertyName || '').trim();
+  const building = (report.building || '').trim();
+  const road = (report.road || '').trim();
+  const block = (report.block || '').trim();
+  const area = (report.area || '').trim();
+
+  const firstSegment = `${name}${building ? ` مبنى ${building}` : ''}`.trim();
+  const secondSegment = road ? `طريق ${road}` : '';
+
+  // ✅ Include block + area like: "542 المنامة"
+  const blockArea = [block, area].filter(Boolean).join(' ').trim();
+
+  // ✅ Removed postcode completely
+  const thirdSegment = blockArea;
+
+  return [firstSegment, secondSegment, thirdSegment].filter(Boolean).join(', ');
+}
+
 export default function PropertyReportPdfView({ report, generatedDate }: PropertyReportPdfViewProps) {
+  const addressLine = buildOneLineAddress(report);
+
   return (
     <div className="pdf-report" dir="rtl">
       {/* Header */}
@@ -22,6 +43,17 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
       {/* Property Information */}
       <section className="pdf-section">
         <h3 className="pdf-section-title">بيانات العقار | Property Information</h3>
+
+        {/* One-line address */}
+        {addressLine && (
+          <div className="pdf-field">
+            <span className="pdf-label">العنوان | Address:</span>
+            <span className="pdf-value" dir="ltr">
+              {addressLine}
+            </span>
+          </div>
+        )}
+
         <div className="pdf-field-grid">
           {report.waqfType && (
             <div className="pdf-field">
@@ -93,7 +125,12 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
           {report.locationLink && (
             <div className="pdf-field">
               <span className="pdf-label">رابط الموقع | Link:</span>
-              <a href={report.locationLink} className="pdf-link" target="_blank" rel="noopener noreferrer">
+              <a
+                href={report.locationLink}
+                className="pdf-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 {report.locationLink}
               </a>
             </div>
@@ -134,7 +171,12 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
             {report.mainPhotos.map((photo, index) => (
               <div key={photo.localId} className="pdf-photo-item">
                 {photo.uploadedUrl ? (
-                  <a href={photo.uploadedUrl} target="_blank" rel="noopener noreferrer" className="pdf-photo-link">
+                  <a
+                    href={photo.uploadedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pdf-photo-link"
+                  >
                     <img
                       src={photo.previewUrl || URL.createObjectURL(photo.file)}
                       alt={`Photo ${index + 1}`}
@@ -165,7 +207,9 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
           <div className="pdf-field">
             <span className="pdf-label">نوع الزيارة | Visit Type:</span>
             <span className="pdf-value">
-              {report.visitType === 'routine' ? 'زيارة دورية | Routine Visit' : 'بلاغ | Complaint'}
+              {report.visitType === 'routine'
+                ? 'زيارة دورية | Routine Visit'
+                : 'بلاغ | Complaint'}
             </span>
           </div>
           {report.complaint && (
@@ -175,7 +219,6 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
             </div>
           )}
 
-          {/* Complaint Files inside Visit Information */}
           {report.complaintFiles.length > 0 && (
             <>
               <div className="pdf-field" style={{ marginTop: '12px' }}>
@@ -186,7 +229,12 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
                   <div key={file.localId} className="pdf-file-item">
                     <span className="pdf-file-number">{index + 1}.</span>
                     {file.uploadedUrl ? (
-                      <a href={file.uploadedUrl} target="_blank" rel="noopener noreferrer" className="pdf-file-link">
+                      <a
+                        href={file.uploadedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pdf-file-link"
+                      >
                         {file.name}
                       </a>
                     ) : (
@@ -206,18 +254,26 @@ export default function PropertyReportPdfView({ report, generatedDate }: Propert
       {/* Findings */}
       {report.findings.length > 0 && (
         <section className="pdf-section">
-          <h3 className="pdf-section-title">الملاحظات | Findings</h3>
+          <h3 className="pdf-section-title">كشف الملاحظة | Findings</h3>
           {report.findings.map((finding, findingIndex) => (
             <div key={finding.id} className="pdf-finding">
               <div className="pdf-finding-header">
-                <strong>ملاحظة {findingIndex + 1} | Finding {findingIndex + 1}:</strong> {finding.text}
+                <strong>
+                   Finding {findingIndex + 1} :
+                </strong>{' '}
+                {finding.text}
               </div>
               {finding.photos.length > 0 && (
                 <div className="pdf-photo-grid pdf-finding-photos">
                   {finding.photos.map((photo, photoIndex) => (
                     <div key={photo.localId} className="pdf-photo-item">
                       {photo.uploadedUrl ? (
-                        <a href={photo.uploadedUrl} target="_blank" rel="noopener noreferrer" className="pdf-photo-link">
+                        <a
+                          href={photo.uploadedUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pdf-photo-link"
+                        >
                           <img
                             src={photo.previewUrl || URL.createObjectURL(photo.file)}
                             alt={`Finding ${findingIndex + 1} Photo ${photoIndex + 1}`}

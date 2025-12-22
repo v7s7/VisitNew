@@ -6,12 +6,12 @@ import * as propertiesService from '../services/propertiesService.js';
  */
 export async function searchPropertiesHandler(req, res) {
   try {
-    const searchQuery = req.query.search || '';
+    const searchQuery = String(req.query.search || '').trim();
 
-    if (!searchQuery.trim()) {
+    if (!searchQuery) {
       return res.json({
         properties: [],
-        total: 0
+        total: 0,
       });
     }
 
@@ -19,15 +19,15 @@ export async function searchPropertiesHandler(req, res) {
 
     console.log(`🔍 Search: "${searchQuery}" - Found ${properties.length} properties`);
 
-    res.json({
+    return res.json({
       properties,
-      total: properties.length
+      total: properties.length,
     });
   } catch (error) {
     console.error('Search error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to search properties',
-      message: error.message
+      message: error?.message || 'Unknown error',
     });
   }
 }
@@ -39,20 +39,27 @@ export async function searchPropertiesHandler(req, res) {
 export async function getPropertyHandler(req, res) {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        error: 'Missing property id',
+      });
+    }
+
     const property = await propertiesService.getPropertyById(id);
 
     if (!property) {
       return res.status(404).json({
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
-    res.json(property);
+    return res.json(property);
   } catch (error) {
     console.error('Get property error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to get property',
-      message: error.message
+      message: error?.message || 'Unknown error',
     });
   }
 }

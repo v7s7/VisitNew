@@ -33,6 +33,7 @@ export default function PropertyReportForm() {
     complaint: '',
     corrector: '',
   });
+
   const [mainPhotos, setMainPhotos] = useState<UploadedPhoto[]>([]);
   const [complaintFiles, setComplaintFiles] = useState<ComplaintFile[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -44,12 +45,12 @@ export default function PropertyReportForm() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipError, setZipError] = useState<string | null>(null);
 
-  // Auto-fill fields when property is selected
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
+
     if (property) {
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         waqfType: property.waqfType || '',
         propertyType: property.propertyType || '',
         endowedTo: property.endowedTo || '',
@@ -59,50 +60,44 @@ export default function PropertyReportForm() {
         area: property.area || '',
         governorate: property.governorate || '',
         block: property.block || '',
-        locationLink: property.defaultLocationLink || formData.locationLink,
-      });
-    } else {
-      // Reset form when property is deselected
-      setFormData({
-        waqfType: '',
-        propertyType: '',
-        endowedTo: '',
-        building: '',
-        unitNumber: '',
-        road: '',
-        area: '',
-        governorate: '',
-        block: '',
-        locationDescription: '',
-        locationLink: '',
-        floorsCount: '',
-        flatsCount: '',
-        additionalNotes: '',
-        visitType: '',
-        complaint: '',
-        corrector: '',
-      });
-      setMainPhotos([]);
-      setComplaintFiles([]);
-      setFindings([]);
-      setActions([]);
+        locationLink: property.defaultLocationLink || prev.locationLink,
+      }));
+      return;
     }
+
+    setFormData({
+      waqfType: '',
+      propertyType: '',
+      endowedTo: '',
+      building: '',
+      unitNumber: '',
+      road: '',
+      area: '',
+      governorate: '',
+      block: '',
+      locationDescription: '',
+      locationLink: '',
+      floorsCount: '',
+      flatsCount: '',
+      additionalNotes: '',
+      visitType: '',
+      complaint: '',
+      corrector: '',
+    });
+    setMainPhotos([]);
+    setComplaintFiles([]);
+    setFindings([]);
+    setActions([]);
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const validateForm = (): string | null => {
-    if (!selectedProperty) {
-      return 'يرجى اختيار العقار | Please select a property';
-    }
+    if (!selectedProperty) return 'يرجى اختيار العقار | Please select a property';
+    if (!formData.visitType.trim()) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
 
-    if (!formData.visitType.trim()) {
-      return 'يرجى تحديد نوع الزيارة | Please specify visit type';
-    }
-
-    // Only require complaint if visit type is "complaint"
     if (formData.visitType === 'complaint' && !formData.complaint.trim()) {
       return 'يرجى كتابة تفاصيل البلاغ | Please enter complaint details';
     }
@@ -115,14 +110,12 @@ export default function PropertyReportForm() {
       return 'يرجى إضافة صورة واحدة على الأقل | Please add at least one photo';
     }
 
-    // Validate findings have text if they exist
     for (const finding of findings) {
       if (!finding.text.trim()) {
         return 'يرجى كتابة وصف لجميع الملاحظات | Please add description for all findings';
       }
     }
 
-    // Validate actions have text if they exist
     for (const action of actions) {
       if (!action.text.trim()) {
         return 'يرجى كتابة وصف لجميع الإجراءات | Please add description for all actions';
@@ -148,10 +141,15 @@ export default function PropertyReportForm() {
     setSubmitError(null);
 
     try {
-      // Upload all photos first
       const uploadMainPhotos = async () => {
         const uploadPromises = mainPhotos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, 'الصور الرئيسية')
+          uploadFile(
+            photo.file,
+            selectedProperty.code,
+            formData.propertyType,
+            formData.endowedTo,
+            'الصور الرئيسية'
+          )
         );
         const results = await Promise.all(uploadPromises);
         return mainPhotos.map((photo, index) => ({
@@ -163,15 +161,21 @@ export default function PropertyReportForm() {
       const uploadFindingPhotos = async (finding: Finding, findingIndex: number) => {
         if (finding.photos.length === 0) return finding;
 
-        // Create folder name: "Finding1 - [description]"
         const findingNumber = findingIndex + 1;
-        const findingDescription = finding.text.substring(0, 50); // Limit to 50 chars
+        const findingDescription = finding.text.substring(0, 50);
         const findingFolderName = `Finding${findingNumber} - ${findingDescription}`;
 
         const uploadPromises = finding.photos.map((photo) =>
-          uploadFile(photo.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, findingFolderName)
+          uploadFile(
+            photo.file,
+            selectedProperty.code,
+            formData.propertyType,
+            formData.endowedTo,
+            findingFolderName
+          )
         );
         const results = await Promise.all(uploadPromises);
+
         return {
           ...finding,
           photos: finding.photos.map((photo, index) => ({
@@ -184,7 +188,13 @@ export default function PropertyReportForm() {
       const uploadComplaintFiles = async () => {
         if (complaintFiles.length === 0) return [];
         const uploadPromises = complaintFiles.map((file) =>
-          uploadFile(file.file, selectedProperty.code, selectedProperty.propertyType, selectedProperty.endowedTo, 'ملفات البلاغ')
+          uploadFile(
+            file.file,
+            selectedProperty.code,
+            formData.propertyType,
+            formData.endowedTo,
+            'ملفات البلاغ'
+          )
         );
         const results = await Promise.all(uploadPromises);
         return complaintFiles.map((file, index) => ({
@@ -195,13 +205,15 @@ export default function PropertyReportForm() {
 
       const uploadedMainPhotos = await uploadMainPhotos();
       const uploadedComplaintFiles = await uploadComplaintFiles();
-      const uploadedFindings = await Promise.all(findings.map((finding, index) => uploadFindingPhotos(finding, index)));
+      const uploadedFindings = await Promise.all(
+        findings.map((finding, index) => uploadFindingPhotos(finding, index))
+      );
 
-      // Prepare report data
       const report: PropertyReport = {
         propertyId: selectedProperty.id,
         propertyCode: selectedProperty.code,
         propertyName: selectedProperty.name,
+
         waqfType: formData.waqfType,
         propertyType: formData.propertyType,
         endowedTo: formData.endowedTo,
@@ -211,22 +223,27 @@ export default function PropertyReportForm() {
         area: formData.area,
         governorate: formData.governorate,
         block: formData.block,
+
         locationDescription: formData.locationDescription,
         locationLink: formData.locationLink,
+
         mainPhotos: uploadedMainPhotos,
+
         floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
         flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
         additionalNotes: formData.additionalNotes || undefined,
+
         visitType: formData.visitType,
         complaint: formData.complaint,
         complaintFiles: uploadedComplaintFiles,
+
         findings: uploadedFindings,
-        actions: actions,
+        actions,
+
         corrector: formData.corrector || undefined,
         submittedAt: new Date().toISOString(),
       };
 
-      // Submit report
       const response = await submitReport(report);
 
       if (response.success) {
@@ -234,7 +251,6 @@ export default function PropertyReportForm() {
         setSubmitError(null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        // Reset form after 2 seconds
         setTimeout(() => {
           handlePropertySelect(null);
           setSubmitSuccess(false);
@@ -253,14 +269,14 @@ export default function PropertyReportForm() {
     }
   };
 
-  const handlePrint = async () => {
-    if (!selectedProperty) return;
+  const buildCurrentReport = (): PropertyReport | null => {
+    if (!selectedProperty) return null;
 
-    // Build current report object from form state
-    const currentReport: PropertyReport = {
+    return {
       propertyId: selectedProperty.id,
       propertyCode: selectedProperty.code,
       propertyName: selectedProperty.name,
+
       waqfType: formData.waqfType,
       propertyType: formData.propertyType,
       endowedTo: formData.endowedTo,
@@ -270,21 +286,30 @@ export default function PropertyReportForm() {
       area: formData.area,
       governorate: formData.governorate,
       block: formData.block,
+
       locationDescription: formData.locationDescription,
       locationLink: formData.locationLink,
-      mainPhotos: mainPhotos,
+
+      mainPhotos,
       floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
       flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
       additionalNotes: formData.additionalNotes || undefined,
+
       visitType: formData.visitType,
       complaint: formData.complaint,
-      complaintFiles: complaintFiles,
-      findings: findings,
-      actions: actions,
+      complaintFiles,
+
+      findings,
+      actions,
+
       corrector: formData.corrector || undefined,
     };
+  };
 
-    // Validate report
+  const handlePrint = async () => {
+    const currentReport = buildCurrentReport();
+    if (!currentReport) return;
+
     const validationError = validateReportForPdf(currentReport);
     if (validationError) {
       setPdfError(validationError);
@@ -296,46 +321,20 @@ export default function PropertyReportForm() {
 
     try {
       await printReport(currentReport);
-      // Print dialog opened successfully
     } catch (error: any) {
       console.error('Print error:', error);
-      setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
+      setPdfError(
+        error.message ||
+          'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
+      );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handleDownloadZip = async () => {
-    if (!selectedProperty) return;
+    const currentReport = buildCurrentReport();
+    if (!currentReport) return;
 
-    // Build current report object from form state
-    const currentReport: PropertyReport = {
-      propertyId: selectedProperty.id,
-      propertyCode: selectedProperty.code,
-      propertyName: selectedProperty.name,
-      waqfType: formData.waqfType,
-      propertyType: formData.propertyType,
-      endowedTo: formData.endowedTo,
-      building: formData.building,
-      unitNumber: formData.unitNumber,
-      road: formData.road,
-      area: formData.area,
-      governorate: formData.governorate,
-      block: formData.block,
-      locationDescription: formData.locationDescription,
-      locationLink: formData.locationLink,
-      mainPhotos: mainPhotos,
-      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
-      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
-      additionalNotes: formData.additionalNotes || undefined,
-      visitType: formData.visitType,
-      complaint: formData.complaint,
-      complaintFiles: complaintFiles,
-      findings: findings,
-      actions: actions,
-      corrector: formData.corrector || undefined,
-    };
-
-    // Validate report has files
     const validationError = validateReportForZip(currentReport);
     if (validationError) {
       setZipError(validationError);
@@ -348,7 +347,6 @@ export default function PropertyReportForm() {
 
     try {
       await downloadReportZip(currentReport);
-      // ZIP downloaded successfully
     } catch (error: any) {
       console.error('ZIP download error:', error);
       setZipError(error.message || 'فشل تحميل الملف. حاول مرة أخرى. | Failed to download ZIP. Try again.');
@@ -362,35 +360,7 @@ export default function PropertyReportForm() {
   const isPrintButtonDisabled = !selectedProperty;
   const isZipButtonDisabled = !selectedProperty || isDownloadingZip;
 
-  // Build current report for PDF preview
-  const currentReportForPdf: PropertyReport | null = selectedProperty
-    ? {
-        propertyId: selectedProperty.id,
-        propertyCode: selectedProperty.code,
-        propertyName: selectedProperty.name,
-        waqfType: formData.waqfType,
-        propertyType: formData.propertyType,
-        endowedTo: formData.endowedTo,
-        building: formData.building,
-        unitNumber: formData.unitNumber,
-        road: formData.road,
-        area: formData.area,
-        governorate: formData.governorate,
-        block: formData.block,
-        locationDescription: formData.locationDescription,
-        locationLink: formData.locationLink,
-        mainPhotos: mainPhotos,
-        floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
-        flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
-        additionalNotes: formData.additionalNotes || undefined,
-        visitType: formData.visitType,
-        complaint: formData.complaint,
-        complaintFiles: complaintFiles,
-        findings: findings,
-        actions: actions,
-        corrector: formData.corrector || undefined,
-      }
-    : null;
+  const currentReportForPdf = buildCurrentReport();
 
   return (
     <form onSubmit={handleSubmit} className="property-report-form">
@@ -423,11 +393,7 @@ export default function PropertyReportForm() {
         </div>
       )}
 
-      {/* Property Selection */}
-      <PropertySearch
-        onPropertySelect={handlePropertySelect}
-        selectedProperty={selectedProperty}
-      />
+      <PropertySearch onPropertySelect={handlePropertySelect} selectedProperty={selectedProperty} />
 
       {isFormDisabled && (
         <div className="form-disabled-message">
@@ -437,7 +403,6 @@ export default function PropertyReportForm() {
         </div>
       )}
 
-      {/* Property Details (Editable) */}
       {selectedProperty && (
         <>
           <div className="section">
@@ -543,7 +508,6 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Location Description and Link */}
           <div className="section">
             <h3 className="section-title">الموقع | Location</h3>
 
@@ -570,13 +534,11 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Main Photos */}
           <div className="section">
             <h3 className="section-title">الصور الرئيسية | Main Photos</h3>
             <PhotoUpload photos={mainPhotos} onPhotosChange={setMainPhotos} />
           </div>
 
-          {/* Building Details (Optional) */}
           <div className="section">
             <h3 className="section-title">تفاصيل المبنى (اختياري) | Building Details (Optional)</h3>
 
@@ -616,7 +578,6 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Visit Type and Complaint */}
           <div className="section">
             <h3 className="section-title">معلومات الزيارة | Visit Information</h3>
 
@@ -659,22 +620,15 @@ export default function PropertyReportForm() {
 
                 <div className="field-group">
                   <label>ملفات البلاغ | Complaint Files (Optional)</label>
-                  <ComplaintFileUpload
-                    files={complaintFiles}
-                    onFilesChange={setComplaintFiles}
-                  />
+                  <ComplaintFileUpload files={complaintFiles} onFilesChange={setComplaintFiles} />
                 </div>
               </>
             )}
           </div>
 
-          {/* Findings */}
           <FindingsList findings={findings} onFindingsChange={setFindings} />
-
-          {/* Actions */}
           <ActionsList actions={actions} onActionsChange={setActions} />
 
-          {/* Corrector (Optional) */}
           <div className="section">
             <h3 className="section-title">المصحح | Corrector (Optional)</h3>
             <div className="field-group">
@@ -689,7 +643,6 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="submit-section">
             <button
               type="button"
@@ -721,13 +674,9 @@ export default function PropertyReportForm() {
         </>
       )}
 
-      {/* Hidden PDF View for Generation */}
       {currentReportForPdf && (
         <div id="pdf-content" className="pdf-content-hidden">
-          <PropertyReportPdfView
-            report={currentReportForPdf}
-            generatedDate={formatBahrainDate()}
-          />
+          <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
         </div>
       )}
     </form>

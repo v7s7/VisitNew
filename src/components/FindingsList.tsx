@@ -36,7 +36,7 @@ export default function FindingsList({ findings, onFindingsChange }: FindingsLis
 
   return (
     <div className="findings-list section">
-      <h3 className="section-title">الملاحظات | Findings</h3>
+      <h3 className="section-title">كشف الملاحظة | Findings</h3>
 
       {findings.length === 0 && (
         <p className="empty-message">لا توجد ملاحظات. اضغط "إضافة ملاحظة" لبدء الإضافة.</p>
@@ -45,7 +45,7 @@ export default function FindingsList({ findings, onFindingsChange }: FindingsLis
       {findings.map((finding, index) => (
         <div key={finding.id} className="finding-item card">
           <div className="finding-header">
-            <span className="finding-number">ملاحظة {index + 1}</span>
+            <span className="finding-number">Finding {index + 1}</span>
             <button
               type="button"
               onClick={() => handleRemoveFinding(finding.id)}

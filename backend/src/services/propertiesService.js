@@ -15,6 +15,7 @@ import { getSheetsClient } from '../config/google-hybrid.js';
  * Column K: المحافظة (governorate)
  * Column L: مجمع (block)
  * Column M: defaultLocationLink
+ * Column N: postcode (الرمز البريدي)
  */
 
 /**
@@ -28,25 +29,26 @@ export async function getAllProperties() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:M`, // Skip header row
+      range: `${sheetName}!A2:N`, // Skip header row
     });
 
     const rows = response.data.values || [];
 
-    const properties = rows.map(row => ({
+    const properties = rows.map((row) => ({
       id: row[0] || '',
       code: row[1] || '',
       name: row[2] || '',
-      waqfType: row[3] || '',         // نوع الوقف
-      propertyType: row[4] || '',     // نوع العقار
-      endowedTo: row[5] || '',        // موقوف على
-      building: row[6] || '',         // مبنى
-      unitNumber: row[7] || '',       // رقم الوحدة
-      road: row[8] || '',             // طريق \ شارع
-      area: row[9] || '',             // المنطقة
-      governorate: row[10] || '',     // المحافظة
-      block: row[11] || '',           // مجمع
-      defaultLocationLink: row[12] || ''
+      waqfType: row[3] || '', // نوع الوقف
+      propertyType: row[4] || '', // نوع العقار
+      endowedTo: row[5] || '', // موقوف على
+      building: row[6] || '', // مبنى
+      unitNumber: row[7] || '', // رقم الوحدة
+      road: row[8] || '', // طريق \ شارع
+      area: row[9] || '', // المنطقة
+      governorate: row[10] || '', // المحافظة
+      block: row[11] || '', // مجمع
+      defaultLocationLink: row[12] || '',
+      postcode: row[13] || '', // الرمز البريدي
     }));
 
     return properties;
@@ -57,7 +59,7 @@ export async function getAllProperties() {
 }
 
 /**
- * Search properties by query (name, code, or area)
+ * Search properties by query (name, code, area, governorate, or postcode)
  */
 export async function searchProperties(query) {
   if (!query || !query.trim()) {
@@ -67,12 +69,19 @@ export async function searchProperties(query) {
   const allProperties = await getAllProperties();
   const searchTerm = query.toLowerCase().trim();
 
-  const results = allProperties.filter(property => {
+  const results = allProperties.filter((property) => {
+    const name = (property.name || '').toLowerCase();
+    const code = (property.code || '').toLowerCase();
+    const area = (property.area || '').toLowerCase();
+    const governorate = (property.governorate || '').toLowerCase();
+    const postcode = (property.postcode || '').toLowerCase();
+
     return (
-      property.name.toLowerCase().includes(searchTerm) ||
-      property.code.toLowerCase().includes(searchTerm) ||
-      property.area.toLowerCase().includes(searchTerm) ||
-      property.governorate.toLowerCase().includes(searchTerm)
+      name.includes(searchTerm) ||
+      code.includes(searchTerm) ||
+      area.includes(searchTerm) ||
+      governorate.includes(searchTerm) ||
+      postcode.includes(searchTerm)
     );
   });
 
@@ -85,7 +94,7 @@ export async function searchProperties(query) {
  */
 export async function getPropertyById(id) {
   const allProperties = await getAllProperties();
-  return allProperties.find(property => property.id === id);
+  return allProperties.find((property) => property.id === id);
 }
 
 /**
@@ -93,5 +102,5 @@ export async function getPropertyById(id) {
  */
 export async function getPropertyByCode(code) {
   const allProperties = await getAllProperties();
-  return allProperties.find(property => property.code === code);
+  return allProperties.find((property) => property.code === code);
 }
