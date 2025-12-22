@@ -1,6 +1,6 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useMemo } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
-import { submitReport, uploadFile } from '../api';
+import { submitReport, uploadFile, generateReportExports } from '../api';
 import { isValidUrl } from '../utils';
 import { printReport, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
 import { downloadReportZip, validateReportForZip } from '../zipUtils';
@@ -11,6 +11,34 @@ import FindingsList from './FindingsList';
 import ActionsList from './ActionsList';
 import PropertyReportPdfView from './PropertyReportPdfView';
 import './PropertyReportForm.css';
+
+function isProbablyMobile() {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || window.innerWidth < 768;
+}
+
+async function shareText(title: string, text: string) {
+  // Best-effort share for mobile browsers
+  // If share API not available, fallback to clipboard
+  const canShare = typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function';
+
+  if (canShare) {
+    try {
+      await (navigator as any).share({ title, text });
+      return { ok: true, method: 'share' as const };
+    } catch {
+      // user canceled or browser blocked
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    return { ok: true, method: 'clipboard' as const };
+  } catch {
+    return { ok: false, method: 'none' as const };
+  }
+}
 
 export default function PropertyReportForm() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -45,8 +73,17 @@ export default function PropertyReportForm() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipError, setZipError] = useState<string | null>(null);
 
+  // New: backend exports state
+  const [isGeneratingExports, setIsGeneratingExports] = useState(false);
+  const [exportsError, setExportsError] = useState<string | null>(null);
+  const [exportsResult, setExportsResult] = useState<any | null>(null);
+
+  const isMobile = useMemo(() => isProbablyMobile(), []);
+
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
+    setExportsResult(null);
+    setExportsError(null);
 
     if (property) {
       setFormData((prev) => ({
@@ -125,6 +162,65 @@ export default function PropertyReportForm() {
     return null;
   };
 
+  const buildCurrentReport = (): PropertyReport | null => {
+    if (!selectedProperty) return null;
+
+    return {
+      propertyId: selectedProperty.id,
+      propertyCode: selectedProperty.code,
+      propertyName: selectedProperty.name,
+
+      waqfType: formData.waqfType,
+      propertyType: formData.propertyType,
+      endowedTo: formData.endowedTo,
+      building: formData.building,
+      unitNumber: formData.unitNumber,
+      road: formData.road,
+      area: formData.area,
+      governorate: formData.governorate,
+      block: formData.block,
+
+      locationDescription: formData.locationDescription,
+      locationLink: formData.locationLink,
+
+      mainPhotos,
+      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+      additionalNotes: formData.additionalNotes || undefined,
+
+      visitType: formData.visitType,
+      complaint: formData.complaint,
+      complaintFiles,
+
+      findings,
+      actions,
+
+      corrector: formData.corrector || undefined,
+    };
+  };
+
+  const generateExportsAfterSubmit = async (reportId: string) => {
+    setIsGeneratingExports(true);
+    setExportsError(null);
+    setExportsResult(null);
+
+    try {
+      const result = await generateReportExports(reportId);
+      setExportsResult(result?.exports || result);
+      return result;
+    } catch (error: any) {
+      console.error('Exports generation error:', error);
+      setExportsError(
+        error.message ||
+          'فشل تجهيز ملفات التصدير. يمكنك المحاولة مرة أخرى. | Failed to generate exports. You can try again.'
+      );
+      return null;
+    } finally {
+      setIsGeneratingExports(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -139,17 +235,13 @@ export default function PropertyReportForm() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setExportsError(null);
+    setExportsResult(null);
 
     try {
       const uploadMainPhotos = async () => {
         const uploadPromises = mainPhotos.map((photo) =>
-          uploadFile(
-            photo.file,
-            selectedProperty.code,
-            formData.propertyType,
-            formData.endowedTo,
-            'الصور الرئيسية'
-          )
+          uploadFile(photo.file, selectedProperty.code, formData.propertyType, formData.endowedTo, 'الصور الرئيسية')
         );
         const results = await Promise.all(uploadPromises);
         return mainPhotos.map((photo, index) => ({
@@ -163,16 +255,11 @@ export default function PropertyReportForm() {
 
         const findingNumber = findingIndex + 1;
         const findingDescription = finding.text.substring(0, 50);
-        const findingFolderName = `Finding${findingNumber} - ${findingDescription}`;
+        // IMPORTANT: backend expects "Finding <n> - ..." (with space after Finding)
+        const findingFolderName = `Finding ${findingNumber} - ${findingDescription}`;
 
         const uploadPromises = finding.photos.map((photo) =>
-          uploadFile(
-            photo.file,
-            selectedProperty.code,
-            formData.propertyType,
-            formData.endowedTo,
-            findingFolderName
-          )
+          uploadFile(photo.file, selectedProperty.code, formData.propertyType, formData.endowedTo, findingFolderName)
         );
         const results = await Promise.all(uploadPromises);
 
@@ -188,13 +275,7 @@ export default function PropertyReportForm() {
       const uploadComplaintFiles = async () => {
         if (complaintFiles.length === 0) return [];
         const uploadPromises = complaintFiles.map((file) =>
-          uploadFile(
-            file.file,
-            selectedProperty.code,
-            formData.propertyType,
-            formData.endowedTo,
-            'ملفات البلاغ'
-          )
+          uploadFile(file.file, selectedProperty.code, formData.propertyType, formData.endowedTo, 'ملفات البلاغ')
         );
         const results = await Promise.all(uploadPromises);
         return complaintFiles.map((file, index) => ({
@@ -205,9 +286,7 @@ export default function PropertyReportForm() {
 
       const uploadedMainPhotos = await uploadMainPhotos();
       const uploadedComplaintFiles = await uploadComplaintFiles();
-      const uploadedFindings = await Promise.all(
-        findings.map((finding, index) => uploadFindingPhotos(finding, index))
-      );
+      const uploadedFindings = await Promise.all(findings.map((finding, index) => uploadFindingPhotos(finding, index)));
 
       const report: PropertyReport = {
         propertyId: selectedProperty.id,
@@ -246,64 +325,30 @@ export default function PropertyReportForm() {
 
       const response = await submitReport(report);
 
-      if (response.success) {
-        setSubmitSuccess(true);
-        setSubmitError(null);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        setTimeout(() => {
-          handlePropertySelect(null);
-          setSubmitSuccess(false);
-        }, 2000);
-      } else {
+      if (!response.success) {
         throw new Error(response.message || 'Submission failed');
       }
+
+      setSubmitSuccess(true);
+      setSubmitError(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Phone-first: auto-generate exports immediately after submit
+      if (response.reportId) {
+        await generateExportsAfterSubmit(response.reportId);
+      }
+
+      setTimeout(() => {
+        handlePropertySelect(null);
+        setSubmitSuccess(false);
+      }, 2500);
     } catch (error: any) {
       console.error('Submit error:', error);
-      setSubmitError(
-        error.message || 'فشل إرسال التقرير. حاول مرة أخرى. | Report submission failed. Try again.'
-      );
+      setSubmitError(error.message || 'فشل إرسال التقرير. حاول مرة أخرى. | Report submission failed. Try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const buildCurrentReport = (): PropertyReport | null => {
-    if (!selectedProperty) return null;
-
-    return {
-      propertyId: selectedProperty.id,
-      propertyCode: selectedProperty.code,
-      propertyName: selectedProperty.name,
-
-      waqfType: formData.waqfType,
-      propertyType: formData.propertyType,
-      endowedTo: formData.endowedTo,
-      building: formData.building,
-      unitNumber: formData.unitNumber,
-      road: formData.road,
-      area: formData.area,
-      governorate: formData.governorate,
-      block: formData.block,
-
-      locationDescription: formData.locationDescription,
-      locationLink: formData.locationLink,
-
-      mainPhotos,
-      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
-      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
-      additionalNotes: formData.additionalNotes || undefined,
-
-      visitType: formData.visitType,
-      complaint: formData.complaint,
-      complaintFiles,
-
-      findings,
-      actions,
-
-      corrector: formData.corrector || undefined,
-    };
   };
 
   const handlePrint = async () => {
@@ -324,8 +369,7 @@ export default function PropertyReportForm() {
     } catch (error: any) {
       console.error('Print error:', error);
       setPdfError(
-        error.message ||
-          'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
+        error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
       );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -353,6 +397,28 @@ export default function PropertyReportForm() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsDownloadingZip(false);
+    }
+  };
+
+  const handleShareExportsLinks = async () => {
+    if (!exportsResult) return;
+
+    const pdfUrl = exportsResult?.pdf?.url || exportsResult?.exports?.pdf?.url;
+    const zipUrl = exportsResult?.zip?.url || exportsResult?.exports?.zip?.url;
+    const folderUrl = exportsResult?.exportsFolderUrl || exportsResult?.folderUrl;
+
+    const lines = [
+      'VisitProp Exports',
+      pdfUrl ? `PDF: ${pdfUrl}` : '',
+      zipUrl ? `ZIP: ${zipUrl}` : '',
+      folderUrl ? `Folder: ${folderUrl}` : '',
+    ].filter(Boolean);
+
+    const text = lines.join('\n');
+
+    const result = await shareText('VisitProp Exports', text);
+    if (!result.ok) {
+      alert('Share not supported. Copy the links manually from the buttons.');
     }
   };
 
@@ -387,9 +453,77 @@ export default function PropertyReportForm() {
         </div>
       )}
 
+      {exportsError && (
+        <div className="alert alert-error" role="alert">
+          {exportsError}
+        </div>
+      )}
+
       {submitSuccess && (
         <div className="alert alert-success" role="alert">
           تم إرسال التقرير بنجاح! ✓ | Report submitted successfully! ✓
+        </div>
+      )}
+
+      {/* Exports result block (after submit) */}
+      {isGeneratingExports && (
+        <div className="alert alert-success" role="status">
+          Preparing PDF & ZIP and uploading to Drive...
+        </div>
+      )}
+
+      {exportsResult && (
+        <div className="alert alert-success" role="status" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontWeight: 700 }}>Exports are ready on Google Drive</div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {exportsResult?.pdf?.url && (
+              <a className="zip-button" href={exportsResult.pdf.url} target="_blank" rel="noreferrer">
+                Open PDF
+              </a>
+            )}
+            {exportsResult?.zip?.url && (
+              <a className="zip-button" href={exportsResult.zip.url} target="_blank" rel="noreferrer">
+                Open ZIP
+              </a>
+            )}
+            {(exportsResult?.exportsFolderUrl || exportsResult?.folderUrl) && (
+              <a
+                className="pdf-button"
+                href={exportsResult.exportsFolderUrl || exportsResult.folderUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open Exports Folder
+              </a>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="button" className="pdf-button" onClick={handleShareExportsLinks}>
+              Share Links
+            </button>
+
+            {/* allow retry */}
+            {selectedProperty && (
+              <button
+                type="button"
+                className="zip-button"
+                onClick={() => {
+                  // If we generated exports, reportId may not be on exportsResult; ask user to re-submit if missing.
+                  alert('To regenerate exports, submit the report again (or add a dedicated regenerate action using reportId).');
+                }}
+              >
+                Regenerate (optional)
+              </button>
+            )}
+          </div>
+
+          {isMobile && (
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              Tip: Use “Share Links” to send PDF/ZIP to WhatsApp or Email, then download later on PC.
+            </div>
+          )}
         </div>
       )}
 
@@ -643,6 +777,7 @@ export default function PropertyReportForm() {
             </div>
           </div>
 
+          {/* Desktop tools remain available */}
           <div className="submit-section">
             <button
               type="button"
@@ -668,6 +803,22 @@ export default function PropertyReportForm() {
                 </>
               ) : (
                 '📦 تحميل ZIP / Download ZIP'
+              )}
+            </button>
+
+            <button
+              type="submit"
+              className="submit-button"
+              disabled={isSubmitting || isGeneratingExports}
+              title="إرسال التقرير | Submit report"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="loading"></span>
+                  <span>جاري الإرسال...</span>
+                </>
+              ) : (
+                'إرسال / Submit'
               )}
             </button>
           </div>
