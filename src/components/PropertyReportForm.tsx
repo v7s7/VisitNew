@@ -19,8 +19,6 @@ function isProbablyMobile() {
 }
 
 async function shareText(title: string, text: string) {
-  // Best-effort share for mobile browsers
-  // If share API not available, fallback to clipboard
   const canShare = typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function';
 
   if (canShare) {
@@ -28,7 +26,7 @@ async function shareText(title: string, text: string) {
       await (navigator as any).share({ title, text });
       return { ok: true, method: 'share' as const };
     } catch {
-      // user canceled or browser blocked
+      // user canceled or blocked
     }
   }
 
@@ -73,7 +71,6 @@ export default function PropertyReportForm() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipError, setZipError] = useState<string | null>(null);
 
-  // New: backend exports state
   const [isGeneratingExports, setIsGeneratingExports] = useState(false);
   const [exportsError, setExportsError] = useState<string | null>(null);
   const [exportsResult, setExportsResult] = useState<any | null>(null);
@@ -255,7 +252,6 @@ export default function PropertyReportForm() {
 
         const findingNumber = findingIndex + 1;
         const findingDescription = finding.text.substring(0, 50);
-        // IMPORTANT: backend expects "Finding <n> - ..." (with space after Finding)
         const findingFolderName = `Finding ${findingNumber} - ${findingDescription}`;
 
         const uploadPromises = finding.photos.map((photo) =>
@@ -333,7 +329,6 @@ export default function PropertyReportForm() {
       setSubmitError(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // Phone-first: auto-generate exports immediately after submit
       if (response.reportId) {
         await generateExportsAfterSubmit(response.reportId);
       }
@@ -368,9 +363,7 @@ export default function PropertyReportForm() {
       await printReport(currentReport);
     } catch (error: any) {
       console.error('Print error:', error);
-      setPdfError(
-        error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
-      );
+      setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -407,12 +400,9 @@ export default function PropertyReportForm() {
     const zipUrl = exportsResult?.zip?.url || exportsResult?.exports?.zip?.url;
     const folderUrl = exportsResult?.exportsFolderUrl || exportsResult?.folderUrl;
 
-    const lines = [
-      'VisitProp Exports',
-      pdfUrl ? `PDF: ${pdfUrl}` : '',
-      zipUrl ? `ZIP: ${zipUrl}` : '',
-      folderUrl ? `Folder: ${folderUrl}` : '',
-    ].filter(Boolean);
+    const lines = ['VisitProp Exports', pdfUrl ? `PDF: ${pdfUrl}` : '', zipUrl ? `ZIP: ${zipUrl}` : '', folderUrl ? `Folder: ${folderUrl}` : ''].filter(
+      Boolean
+    );
 
     const text = lines.join('\n');
 
@@ -465,7 +455,6 @@ export default function PropertyReportForm() {
         </div>
       )}
 
-      {/* Exports result block (after submit) */}
       {isGeneratingExports && (
         <div className="alert alert-success" role="status">
           Preparing PDF & ZIP and uploading to Drive...
@@ -488,12 +477,7 @@ export default function PropertyReportForm() {
               </a>
             )}
             {(exportsResult?.exportsFolderUrl || exportsResult?.folderUrl) && (
-              <a
-                className="pdf-button"
-                href={exportsResult.exportsFolderUrl || exportsResult.folderUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
+              <a className="pdf-button" href={exportsResult.exportsFolderUrl || exportsResult.folderUrl} target="_blank" rel="noreferrer">
                 Open Exports Folder
               </a>
             )}
@@ -504,13 +488,11 @@ export default function PropertyReportForm() {
               Share Links
             </button>
 
-            {/* allow retry */}
             {selectedProperty && (
               <button
                 type="button"
                 className="zip-button"
                 onClick={() => {
-                  // If we generated exports, reportId may not be on exportsResult; ask user to re-submit if missing.
                   alert('To regenerate exports, submit the report again (or add a dedicated regenerate action using reportId).');
                 }}
               >
@@ -544,101 +526,47 @@ export default function PropertyReportForm() {
 
             <div className="field-group">
               <label htmlFor="waqfType">نوع الوقف | Waqf Type</label>
-              <input
-                type="text"
-                id="waqfType"
-                value={formData.waqfType}
-                onChange={(e) => handleInputChange('waqfType', e.target.value)}
-                placeholder="أدخل نوع الوقف"
-              />
+              <input type="text" id="waqfType" value={formData.waqfType} onChange={(e) => handleInputChange('waqfType', e.target.value)} placeholder="أدخل نوع الوقف" />
             </div>
 
             <div className="field-group">
               <label htmlFor="propertyType">نوع العقار | Property Type</label>
-              <input
-                type="text"
-                id="propertyType"
-                value={formData.propertyType}
-                onChange={(e) => handleInputChange('propertyType', e.target.value)}
-                placeholder="أدخل نوع العقار"
-              />
+              <input type="text" id="propertyType" value={formData.propertyType} onChange={(e) => handleInputChange('propertyType', e.target.value)} placeholder="أدخل نوع العقار" />
             </div>
 
             <div className="field-group">
               <label htmlFor="endowedTo">موقوف على | Endowed To</label>
-              <input
-                type="text"
-                id="endowedTo"
-                value={formData.endowedTo}
-                onChange={(e) => handleInputChange('endowedTo', e.target.value)}
-                placeholder="أدخل موقوف على"
-              />
+              <input type="text" id="endowedTo" value={formData.endowedTo} onChange={(e) => handleInputChange('endowedTo', e.target.value)} placeholder="أدخل موقوف على" />
             </div>
 
             <div className="field-group">
               <label htmlFor="building">مبنى | Building</label>
-              <input
-                type="text"
-                id="building"
-                value={formData.building}
-                onChange={(e) => handleInputChange('building', e.target.value)}
-                placeholder="أدخل المبنى"
-              />
+              <input type="text" id="building" value={formData.building} onChange={(e) => handleInputChange('building', e.target.value)} placeholder="أدخل المبنى" />
             </div>
 
             <div className="field-group">
               <label htmlFor="unitNumber">رقم الوحدة | Unit Number</label>
-              <input
-                type="text"
-                id="unitNumber"
-                value={formData.unitNumber}
-                onChange={(e) => handleInputChange('unitNumber', e.target.value)}
-                placeholder="أدخل رقم الوحدة"
-              />
+              <input type="text" id="unitNumber" value={formData.unitNumber} onChange={(e) => handleInputChange('unitNumber', e.target.value)} placeholder="أدخل رقم الوحدة" />
             </div>
 
             <div className="field-group">
               <label htmlFor="road">طريق / شارع | Road / Street</label>
-              <input
-                type="text"
-                id="road"
-                value={formData.road}
-                onChange={(e) => handleInputChange('road', e.target.value)}
-                placeholder="أدخل الطريق / الشارع"
-              />
+              <input type="text" id="road" value={formData.road} onChange={(e) => handleInputChange('road', e.target.value)} placeholder="أدخل الطريق / الشارع" />
             </div>
 
             <div className="field-group">
               <label htmlFor="area">المنطقة | Area</label>
-              <input
-                type="text"
-                id="area"
-                value={formData.area}
-                onChange={(e) => handleInputChange('area', e.target.value)}
-                placeholder="أدخل المنطقة"
-              />
+              <input type="text" id="area" value={formData.area} onChange={(e) => handleInputChange('area', e.target.value)} placeholder="أدخل المنطقة" />
             </div>
 
             <div className="field-group">
               <label htmlFor="governorate">المحافظة | Governorate</label>
-              <input
-                type="text"
-                id="governorate"
-                value={formData.governorate}
-                onChange={(e) => handleInputChange('governorate', e.target.value)}
-                placeholder="أدخل المحافظة"
-              />
+              <input type="text" id="governorate" value={formData.governorate} onChange={(e) => handleInputChange('governorate', e.target.value)} placeholder="أدخل المحافظة" />
             </div>
 
             <div className="field-group">
               <label htmlFor="block">مجمع | Complex</label>
-              <input
-                type="text"
-                id="block"
-                value={formData.block}
-                onChange={(e) => handleInputChange('block', e.target.value)}
-                placeholder="أدخل المجمع"
-              />
+              <input type="text" id="block" value={formData.block} onChange={(e) => handleInputChange('block', e.target.value)} placeholder="أدخل المجمع" />
             </div>
           </div>
 
@@ -647,24 +575,12 @@ export default function PropertyReportForm() {
 
             <div className="field-group">
               <label htmlFor="locationDescription">وصف الموقع | Location Description</label>
-              <textarea
-                id="locationDescription"
-                value={formData.locationDescription}
-                onChange={(e) => handleInputChange('locationDescription', e.target.value)}
-                placeholder="اكتب وصف الموقع..."
-                rows={3}
-              />
+              <textarea id="locationDescription" value={formData.locationDescription} onChange={(e) => handleInputChange('locationDescription', e.target.value)} placeholder="اكتب وصف الموقع..." rows={3} />
             </div>
 
             <div className="field-group">
               <label htmlFor="locationLink">رابط الموقع | Location Link (Google Maps)</label>
-              <input
-                type="url"
-                id="locationLink"
-                value={formData.locationLink}
-                onChange={(e) => handleInputChange('locationLink', e.target.value)}
-                placeholder="https://maps.google.com/..."
-              />
+              <input type="url" id="locationLink" value={formData.locationLink} onChange={(e) => handleInputChange('locationLink', e.target.value)} placeholder="https://maps.google.com/..." />
             </div>
           </div>
 
@@ -678,37 +594,17 @@ export default function PropertyReportForm() {
 
             <div className="field-group">
               <label htmlFor="floorsCount">عدد الطوابق | No. of Floors</label>
-              <input
-                type="number"
-                id="floorsCount"
-                value={formData.floorsCount}
-                onChange={(e) => handleInputChange('floorsCount', e.target.value)}
-                placeholder="مثال: 5"
-                min="0"
-              />
+              <input type="number" id="floorsCount" value={formData.floorsCount} onChange={(e) => handleInputChange('floorsCount', e.target.value)} placeholder="مثال: 5" min="0" />
             </div>
 
             <div className="field-group">
               <label htmlFor="flatsCount">عدد الشقق | No. of Flats</label>
-              <input
-                type="number"
-                id="flatsCount"
-                value={formData.flatsCount}
-                onChange={(e) => handleInputChange('flatsCount', e.target.value)}
-                placeholder="مثال: 20"
-                min="0"
-              />
+              <input type="number" id="flatsCount" value={formData.flatsCount} onChange={(e) => handleInputChange('flatsCount', e.target.value)} placeholder="مثال: 20" min="0" />
             </div>
 
             <div className="field-group">
               <label htmlFor="additionalNotes">ملاحظات إضافية | Additional Notes</label>
-              <textarea
-                id="additionalNotes"
-                value={formData.additionalNotes}
-                onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
-                placeholder="أي ملاحظات إضافية عن المبنى..."
-                rows={4}
-              />
+              <textarea id="additionalNotes" value={formData.additionalNotes} onChange={(e) => handleInputChange('additionalNotes', e.target.value)} placeholder="أي ملاحظات إضافية عن المبنى..." rows={4} />
             </div>
           </div>
 
@@ -742,14 +638,7 @@ export default function PropertyReportForm() {
               <>
                 <div className="field-group">
                   <label htmlFor="complaint">تفاصيل البلاغ | Complaint Details *</label>
-                  <textarea
-                    id="complaint"
-                    value={formData.complaint}
-                    onChange={(e) => handleInputChange('complaint', e.target.value)}
-                    placeholder="اكتب تفاصيل البلاغ..."
-                    rows={4}
-                    required
-                  />
+                  <textarea id="complaint" value={formData.complaint} onChange={(e) => handleInputChange('complaint', e.target.value)} placeholder="اكتب تفاصيل البلاغ..." rows={4} required />
                 </div>
 
                 <div className="field-group">
@@ -767,35 +656,16 @@ export default function PropertyReportForm() {
             <h3 className="section-title">المصحح | Corrector (Optional)</h3>
             <div className="field-group">
               <label htmlFor="corrector">اسم المصحح | Corrector Name</label>
-              <input
-                type="text"
-                id="corrector"
-                value={formData.corrector}
-                onChange={(e) => handleInputChange('corrector', e.target.value)}
-                placeholder="أدخل اسم المصحح (اختياري)"
-              />
+              <input type="text" id="corrector" value={formData.corrector} onChange={(e) => handleInputChange('corrector', e.target.value)} placeholder="أدخل اسم المصحح (اختياري)" />
             </div>
           </div>
 
-          {/* Desktop tools remain available */}
           <div className="submit-section">
-            <button
-              type="button"
-              className="pdf-button"
-              onClick={handlePrint}
-              disabled={isPrintButtonDisabled}
-              title="طباعة أو حفظ كـ PDF | Print or Save as PDF"
-            >
+            <button type="button" className="pdf-button" onClick={handlePrint} disabled={isPrintButtonDisabled} title="طباعة أو حفظ كـ PDF | Print or Save as PDF">
               🖨️ طباعة / Print
             </button>
 
-            <button
-              type="button"
-              className="zip-button"
-              onClick={handleDownloadZip}
-              disabled={isZipButtonDisabled}
-              title="تحميل جميع الملفات | Download All Files"
-            >
+            <button type="button" className="zip-button" onClick={handleDownloadZip} disabled={isZipButtonDisabled} title="تحميل جميع الملفات | Download All Files">
               {isDownloadingZip ? (
                 <>
                   <span className="loading"></span>
@@ -806,12 +676,7 @@ export default function PropertyReportForm() {
               )}
             </button>
 
-            <button
-              type="submit"
-              className="submit-button"
-              disabled={isSubmitting || isGeneratingExports}
-              title="إرسال التقرير | Submit report"
-            >
+            <button type="submit" className="submit-button" disabled={isSubmitting || isGeneratingExports} title="إرسال التقرير | Submit report">
               {isSubmitting ? (
                 <>
                   <span className="loading"></span>
