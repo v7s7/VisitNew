@@ -39,33 +39,37 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 const BAHRAIN_TIMEZONE = 'Asia/Bahrain';
 
+function parseOptionalInt(value) {
+  if (value === undefined || value === null) return undefined;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 /**
  * Get the next sequential report ID
  */
 async function getNextReportId(sheets, spreadsheetId, sheetName) {
   try {
-    // Get all report IDs from column A
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:A`, // Skip header row
+      range: `${sheetName}!A2:A`,
     });
 
     const rows = response.data.values || [];
 
     if (rows.length === 0) {
-      return 'REPORT-001'; // First report
+      return 'REPORT-001';
     }
 
-    // Extract the last report number
     const lastReportId = rows[rows.length - 1][0] || 'REPORT-000';
-    const lastNumber = parseInt(lastReportId.split('-')[1]) || 0;
+    const lastNumber = parseInt(String(lastReportId).split('-')[1], 10) || 0;
     const nextNumber = lastNumber + 1;
 
-    // Format with leading zeros (e.g., REPORT-001, REPORT-012, REPORT-123)
     return `REPORT-${String(nextNumber).padStart(3, '0')}`;
   } catch (error) {
     console.error('Error getting next report ID:', error);
-    // Fallback to timestamp-based ID if there's an error
     return `REPORT-${Date.now()}`;
   }
 }
@@ -79,86 +83,74 @@ export async function saveReport(report) {
     const spreadsheetId = process.env.GOOGLE_SHEETS_REPORTS_ID;
     const sheetName = process.env.REPORTS_SHEET_NAME || 'Reports';
 
-    // Generate sequential report ID
     const reportId = await getNextReportId(sheets, spreadsheetId, sheetName);
 
-    // Get current time in Bahrain timezone
     const now = new Date();
     const submitDate = formatInTimeZone(now, BAHRAIN_TIMEZONE, 'yyyy-MM-dd');
     const submitTime = formatInTimeZone(now, BAHRAIN_TIMEZONE, 'HH:mm:ss');
 
-    // Format photos URLs
     const mainPhotosUrls = JSON.stringify(
-      report.mainPhotos?.map(p => p.uploadedUrl || p.url) || []
+      report.mainPhotos?.map((p) => p.uploadedUrl || p.url).filter(Boolean) || []
     );
 
-    // Format complaint files
     const complaintFiles = JSON.stringify(
-      report.complaintFiles?.map(f => ({
+      report.complaintFiles?.map((f) => ({
         name: f.name,
         type: f.type,
         size: f.size,
-        url: f.uploadedUrl || ''
+        url: f.uploadedUrl || '',
       })) || []
     );
 
-    // Format findings (text + photo URLs)
     const findings = JSON.stringify(
-      report.findings?.map(f => ({
+      report.findings?.map((f) => ({
         text: f.text,
-        photos: f.photos?.map(p => p.uploadedUrl || p.url) || []
+        photos: f.photos?.map((p) => p.uploadedUrl || p.url).filter(Boolean) || [],
       })) || []
     );
 
-    // Format actions
-    const actions = JSON.stringify(
-      report.actions?.map(a => a.text) || []
-    );
+    const actions = JSON.stringify(report.actions?.map((a) => a.text) || []);
 
-    // Prepare row data
     const rowData = [
-      reportId,                                    // A: reportId (REPORT-001)
-      submitDate,                                  // B: submitDate (YYYY-MM-DD)
-      submitTime,                                  // C: submitTime (HH:mm:ss)
-      report.propertyId || '',                     // D: propertyId
-      report.propertyCode || '',                   // E: propertyCode
-      report.propertyName || '',                   // F: propertyName
-      report.waqfType || '',                       // G: waqfType
-      report.propertyType || '',                   // H: propertyType
-      report.endowedTo || '',                      // I: endowedTo
-      report.building || '',                       // J: building
-      report.unitNumber || '',                     // K: unitNumber
-      report.road || '',                           // L: road
-      report.area || '',                           // M: area
-      report.governorate || '',                    // N: governorate
-      report.block || '',                          // O: block
-      report.locationDescription || '',            // P: locationDescription
-      report.locationLink || '',                   // Q: locationLink
-      report.visitType || '',                      // R: visitType
-      report.complaint || '',                      // S: complaint
-      report.complaintFiles?.length || 0,          // T: complaintFilesCount
-      complaintFiles,                              // U: complaintFiles
-      report.mainPhotos?.length || 0,              // V: mainPhotosCount
-      mainPhotosUrls,                              // W: mainPhotosUrls
-      report.findings?.length || 0,                // X: findingsCount
-      findings,                                    // Y: findings
-      report.actions?.length || 0,                 // Z: actionsCount
-      actions,                                     // AA: actions
-      report.corrector || '',                      // AB: corrector
-      report.inspectorName || '',                  // AC: inspectorName
-      report.floorsCount || '',                    // AD: floorsCount
-      report.flatsCount || '',                     // AE: flatsCount
-      report.additionalNotes || ''                 // AF: additionalNotes
+      reportId,                              // A
+      submitDate,                            // B
+      submitTime,                            // C
+      report.propertyId || '',               // D
+      report.propertyCode || '',             // E
+      report.propertyName || '',             // F
+      report.waqfType || '',                 // G
+      report.propertyType || '',             // H
+      report.endowedTo || '',                // I
+      report.building || '',                 // J
+      report.unitNumber || '',               // K
+      report.road || '',                     // L
+      report.area || '',                     // M
+      report.governorate || '',              // N
+      report.block || '',                    // O
+      report.locationDescription || '',      // P
+      report.locationLink || '',             // Q
+      report.visitType || '',                // R
+      report.complaint || '',                // S
+      report.complaintFiles?.length || 0,    // T
+      complaintFiles,                        // U
+      report.mainPhotos?.length || 0,        // V
+      mainPhotosUrls,                        // W
+      report.findings?.length || 0,          // X
+      findings,                              // Y
+      report.actions?.length || 0,           // Z
+      actions,                               // AA
+      report.corrector || '',                // AB
+      report.inspectorName || '',            // AC
+      report.floorsCount ?? '',              // AD
+      report.flatsCount ?? '',               // AE
+      report.additionalNotes || '',          // AF
     ];
 
-    // Append to sheet
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetName}!A:AF`,
       valueInputOption: 'RAW',
-      requestBody: {
-        values: [rowData]
-      }
+      requestBody: { values: [rowData] },
     });
 
     console.log(`✅ Report saved to Google Sheet: ${reportId}`);
@@ -169,7 +161,7 @@ export async function saveReport(report) {
       success: true,
       reportId,
       spreadsheetId,
-      range: response.data.updates.updatedRange
+      range: response.data.updates.updatedRange,
     };
   } catch (error) {
     console.error('Error saving report to Google Sheet:', error.message);
@@ -188,12 +180,12 @@ export async function getAllReports() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:AF`, // Skip header row
+      range: `${sheetName}!A2:AF`,
     });
 
     const rows = response.data.values || [];
 
-    const reports = rows.map(row => ({
+    return rows.map((row) => ({
       reportId: row[0] || '',
       submitDate: row[1] || '',
       submitTime: row[2] || '',
@@ -213,40 +205,33 @@ export async function getAllReports() {
       locationLink: row[16] || '',
       visitType: row[17] || '',
       complaint: row[18] || '',
-      complaintFilesCount: parseInt(row[19]) || 0,
+      complaintFilesCount: parseInt(row[19], 10) || 0,
       complaintFiles: row[20] ? JSON.parse(row[20]) : [],
-      mainPhotosCount: parseInt(row[21]) || 0,
+      mainPhotosCount: parseInt(row[21], 10) || 0,
       mainPhotosUrls: row[22] ? JSON.parse(row[22]) : [],
-      findingsCount: parseInt(row[23]) || 0,
+      findingsCount: parseInt(row[23], 10) || 0,
       findings: row[24] ? JSON.parse(row[24]) : [],
-      actionsCount: parseInt(row[25]) || 0,
+      actionsCount: parseInt(row[25], 10) || 0,
       actions: row[26] ? JSON.parse(row[26]) : [],
       corrector: row[27] || '',
       inspectorName: row[28] || '',
-      floorsCount: parseInt(row[29]) || 0,
-      flatsCount: parseInt(row[30]) || 0,
-      additionalNotes: row[31] || ''
+      floorsCount: parseOptionalInt(row[29]),
+      flatsCount: parseOptionalInt(row[30]),
+      additionalNotes: row[31] || '',
     }));
-
-    return reports;
   } catch (error) {
     console.error('Error fetching reports from Google Sheet:', error.message);
     throw new Error('Failed to fetch reports from database');
   }
 }
 
-/**
- * Get reports by property code
- */
 export async function getReportsByPropertyCode(propertyCode) {
   const allReports = await getAllReports();
-  return allReports.filter(report => report.propertyCode === propertyCode);
+  return allReports.filter((report) => report.propertyCode === propertyCode);
 }
 
-/**
- * Get report by ID
- */
 export async function getReportById(reportId) {
   const allReports = await getAllReports();
-  return allReports.find(report => report.reportId === reportId);
+  return allReports.find((report) => report.reportId === reportId);
 }
+  

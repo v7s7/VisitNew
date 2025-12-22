@@ -1,0 +1,252 @@
+/* PDF Report Styles */
+.pdf-report {
+  width: 210mm; /* A4 width */
+  min-height: 297mm; /* A4 height */
+  padding: 10mm 15mm;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #1a202c;
+  font-family: 'Arial', 'Helvetica', 'Tahoma', sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  direction: rtl;
+  box-sizing: border-box;
+}
+
+/* Header */
+.pdf-header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 3px solid #2d3748;
+}
+
+.pdf-title {
+  font-size: 22pt;
+  font-weight: bold;
+  color: #2d3748;
+  margin: 0 0 6px 0;
+}
+
+.pdf-subtitle {
+  font-size: 15pt;
+  font-weight: normal;
+  color: #4a5568;
+  margin: 0 0 12px 0;
+}
+
+.pdf-metadata {
+  font-size: 11pt;
+  color: #4a5568;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.pdf-metadata div {
+  margin: 3px 0;
+}
+
+/* Sections */
+.pdf-section {
+  margin-bottom: 20px;
+  page-break-inside: avoid;
+}
+
+.pdf-section-title {
+  font-size: 13pt;
+  font-weight: bold;
+  color: #2d3748;
+  margin: 0 0 10px 0;
+  padding-bottom: 5px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Fields */
+.pdf-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pdf-field {
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-label {
+  font-weight: bold;
+  color: #4a5568;
+  font-size: 10pt;
+  margin-bottom: 2px;
+}
+
+.pdf-value {
+  color: #1a202c;
+  font-size: 10.5pt;
+  word-wrap: break-word;
+}
+
+/* Links */
+.pdf-link {
+  color: #3182ce;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* Photo Grid - 2 columns, larger squares */
+.pdf-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pdf-photo-item {
+  text-align: center;
+  page-break-inside: avoid;
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.pdf-photo-link,
+.pdf-photo-wrapper {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pdf-photo-link {
+  cursor: pointer;
+}
+
+.pdf-photo-link:hover {
+  opacity: 0.9;
+}
+
+.pdf-photo-thumbnail {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 2px solid #cbd5e0;
+  border-radius: 4px;
+  display: block;
+  background: #ffffff;
+}
+
+.pdf-photo-label {
+  font-size: 9pt;
+  color: #4a5568;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+/* File List */
+.pdf-file-list {
+  margin-top: 8px;
+}
+
+.pdf-file-item {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.pdf-file-number {
+  font-weight: bold;
+  color: #4a5568;
+}
+
+.pdf-file-link {
+  color: #3182ce;
+  text-decoration: underline;
+  flex: 1;
+}
+
+.pdf-file-name {
+  flex: 1;
+  color: #1a202c;
+}
+
+.pdf-file-info {
+  font-size: 9pt;
+  color: #718096;
+}
+
+/* Findings */
+.pdf-finding {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f7fafc;
+  border-right: 4px solid #4299e1;
+  border-radius: 4px;
+  page-break-inside: avoid;
+}
+
+.pdf-finding-header {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.pdf-finding-photos {
+  margin-top: 8px;
+}
+
+/* Action List */
+.pdf-action-list {
+  margin: 8px 0;
+  padding-right: 20px;
+}
+
+.pdf-action-item {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* Print-specific styles */
+@media print {
+  /* Remove browser header/footer */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .pdf-report {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  /* Ensure proper page breaks */
+  .pdf-section {
+    page-break-inside: avoid;
+  }
+
+  .pdf-photo-item,
+  .pdf-finding {
+    page-break-inside: avoid;
+  }
+
+  /* Better image quality for print */
+  .pdf-photo-thumbnail {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide any web-specific elements */
+  .no-print {
+    display: none !important;
+  }
+}

@@ -11,6 +11,8 @@
     "server": "cd server && npm install && npm start"
   },
   "dependencies": {
+    "html2pdf.js": "^0.12.1",
+    "jszip": "^3.10.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

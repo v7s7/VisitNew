@@ -14,11 +14,57 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Accept images only
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
+    // Define allowed file types
+    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+    const allowedDocTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain'
+    ];
+
+    const isImage = allowedImageTypes.includes(file.mimetype) || file.mimetype.startsWith('image/');
+    const isDocument = allowedDocTypes.includes(file.mimetype);
+
+    // Note: req.body.subfolder might be undefined if the file field comes before
+    // the subfolder field in the multipart form data. In that case, we allow
+    // common file types and validate in the controller.
+    const subfolder = req.body.subfolder;
+
+    console.log(`   🔍 File filter check: ${file.originalname} (${file.mimetype}), subfolder: ${subfolder || 'undefined'}`);
+
+    // Allow all common file types if subfolder is not available yet
+    if (!subfolder) {
+      if (isImage || isDocument) {
+        console.log(`   ✓ Accepted (subfolder not available, will validate in controller)`);
+        cb(null, true);
+      } else {
+        console.log(`   ✗ Rejected: unsupported file type`);
+        cb(new Error(`Unsupported file type: ${file.mimetype}. Allowed: images, PDFs, Word, Excel, text files`), false);
+      }
+      return;
+    }
+
+    // For "ملفات البلاغ" (Report Files), allow documents and images
+    if (subfolder === 'ملفات البلاغ') {
+      if (isImage || isDocument) {
+        console.log(`   ✓ Accepted for ${subfolder}`);
+        cb(null, true);
+      } else {
+        console.log(`   ✗ Rejected: only images and documents allowed for ${subfolder}`);
+        cb(new Error('Only images, PDFs, Word documents, Excel files, and text files are allowed for Report Files'), false);
+      }
     } else {
-      cb(new Error('Only image files are allowed'), false);
+      // For other subfolders (photos), accept images only
+      if (isImage) {
+        console.log(`   ✓ Accepted for ${subfolder}`);
+        cb(null, true);
+      } else {
+        console.log(`   ✗ Rejected: only images allowed for ${subfolder}`);
+        cb(new Error(`Only image files are allowed for ${subfolder || 'photo folders'}`), false);
+      }
     }
   }
 });

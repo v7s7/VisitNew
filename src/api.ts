@@ -9,25 +9,31 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
- * Search for properties by name or code
+ * Search for properties by name/code/area/governorate/postcode
  * GET /api/properties?search=<query>
  */
 export async function searchProperties(query: string): Promise<Property[]> {
-  if (!query.trim()) {
-    return [];
-  }
+  const q = query.trim();
+  if (!q) return [];
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/properties?search=${encodeURIComponent(query)}`
+      `${API_BASE_URL}/properties?search=${encodeURIComponent(q)}`
     );
 
     if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
+      let message = response.statusText;
+      try {
+        const err = await response.json();
+        message = err?.message || err?.error || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(`Search failed: ${message}`);
     }
 
     const data: PropertySearchResponse = await response.json();
-    return data.properties;
+    return Array.isArray(data.properties) ? data.properties : [];
   } catch (error) {
     console.error('Property search error:', error);
     throw error;
@@ -46,7 +52,6 @@ export async function uploadFile(
   subfolder?: string
 ): Promise<UploadResponse> {
   try {
-    // Validate required parameters
     if (!propertyCode) {
       throw new Error('Property code is required for upload');
     }
@@ -56,9 +61,7 @@ export async function uploadFile(
     formData.append('propertyCode', propertyCode);
     formData.append('propertyType', propertyType || '');
     formData.append('endowedTo', endowedTo || '');
-    if (subfolder) {
-      formData.append('subfolder', subfolder);
-    }
+    if (subfolder) formData.append('subfolder', subfolder);
 
     console.log('📤 Uploading file:', {
       fileName: file.name,
@@ -74,8 +77,14 @@ export async function uploadFile(
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(`Upload failed: ${errorData.message || response.statusText}`);
+      let message = response.statusText;
+      try {
+        const err = await response.json();
+        message = err?.message || err?.error || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(`Upload failed: ${message}`);
     }
 
     const data: UploadResponse = await response.json();
@@ -90,7 +99,9 @@ export async function uploadFile(
  * Submit a complete property report
  * POST /api/reports
  */
-export async function submitReport(report: PropertyReport): Promise<ReportSubmitResponse> {
+export async function submitReport(
+  report: PropertyReport
+): Promise<ReportSubmitResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/reports`, {
       method: 'POST',
@@ -101,7 +112,14 @@ export async function submitReport(report: PropertyReport): Promise<ReportSubmit
     });
 
     if (!response.ok) {
-      throw new Error(`Report submission failed: ${response.statusText}`);
+      let message = response.statusText;
+      try {
+        const err = await response.json();
+        message = err?.message || err?.error || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(`Report submission failed: ${message}`);
     }
 
     const data: ReportSubmitResponse = await response.json();
