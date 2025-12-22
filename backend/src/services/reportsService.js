@@ -35,6 +35,9 @@ import { formatInTimeZone } from 'date-fns-tz';
  * Column AD: floorsCount (عدد الطوابق)
  * Column AE: flatsCount (عدد الشقق)
  * Column AF: additionalNotes (ملاحظات إضافية)
+ *
+ * OPTIONAL (recommended for exports caching later):
+ * Column AG: exports (JSON string: { pdfUrl, zipUrl, folderUrl, pdfName, zipName, generatedAt })
  */
 
 const BAHRAIN_TIMEZONE = 'Asia/Bahrain';
@@ -45,6 +48,15 @@ function parseOptionalInt(value) {
   if (!s) return undefined;
   const n = parseInt(s, 10);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function safeJsonParse(value, fallback) {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -112,38 +124,39 @@ export async function saveReport(report) {
     const actions = JSON.stringify(report.actions?.map((a) => a.text) || []);
 
     const rowData = [
-      reportId,                              // A
-      submitDate,                            // B
-      submitTime,                            // C
-      report.propertyId || '',               // D
-      report.propertyCode || '',             // E
-      report.propertyName || '',             // F
-      report.waqfType || '',                 // G
-      report.propertyType || '',             // H
-      report.endowedTo || '',                // I
-      report.building || '',                 // J
-      report.unitNumber || '',               // K
-      report.road || '',                     // L
-      report.area || '',                     // M
-      report.governorate || '',              // N
-      report.block || '',                    // O
-      report.locationDescription || '',      // P
-      report.locationLink || '',             // Q
-      report.visitType || '',                // R
-      report.complaint || '',                // S
-      report.complaintFiles?.length || 0,    // T
-      complaintFiles,                        // U
-      report.mainPhotos?.length || 0,        // V
-      mainPhotosUrls,                        // W
-      report.findings?.length || 0,          // X
-      findings,                              // Y
-      report.actions?.length || 0,           // Z
-      actions,                               // AA
-      report.corrector || '',                // AB
-      report.inspectorName || '',            // AC
-      report.floorsCount ?? '',              // AD
-      report.flatsCount ?? '',               // AE
-      report.additionalNotes || '',          // AF
+      reportId, // A
+      submitDate, // B
+      submitTime, // C
+      report.propertyId || '', // D
+      report.propertyCode || '', // E
+      report.propertyName || '', // F
+      report.waqfType || '', // G
+      report.propertyType || '', // H
+      report.endowedTo || '', // I
+      report.building || '', // J
+      report.unitNumber || '', // K
+      report.road || '', // L
+      report.area || '', // M
+      report.governorate || '', // N
+      report.block || '', // O
+      report.locationDescription || '', // P
+      report.locationLink || '', // Q
+      report.visitType || '', // R
+      report.complaint || '', // S
+      report.complaintFiles?.length || 0, // T
+      complaintFiles, // U
+      report.mainPhotos?.length || 0, // V
+      mainPhotosUrls, // W
+      report.findings?.length || 0, // X
+      findings, // Y
+      report.actions?.length || 0, // Z
+      actions, // AA
+      report.corrector || '', // AB
+      report.inspectorName || '', // AC
+      report.floorsCount ?? '', // AD
+      report.flatsCount ?? '', // AE
+      report.additionalNotes || '', // AF
+      // AG reserved for exports JSON (optional)
     ];
 
     const response = await sheets.spreadsheets.values.append({
@@ -206,18 +219,19 @@ export async function getAllReports() {
       visitType: row[17] || '',
       complaint: row[18] || '',
       complaintFilesCount: parseInt(row[19], 10) || 0,
-      complaintFiles: row[20] ? JSON.parse(row[20]) : [],
+      complaintFiles: safeJsonParse(row[20], []),
       mainPhotosCount: parseInt(row[21], 10) || 0,
-      mainPhotosUrls: row[22] ? JSON.parse(row[22]) : [],
+      mainPhotosUrls: safeJsonParse(row[22], []),
       findingsCount: parseInt(row[23], 10) || 0,
-      findings: row[24] ? JSON.parse(row[24]) : [],
+      findings: safeJsonParse(row[24], []),
       actionsCount: parseInt(row[25], 10) || 0,
-      actions: row[26] ? JSON.parse(row[26]) : [],
+      actions: safeJsonParse(row[26], []),
       corrector: row[27] || '',
       inspectorName: row[28] || '',
       floorsCount: parseOptionalInt(row[29]),
       flatsCount: parseOptionalInt(row[30]),
       additionalNotes: row[31] || '',
+      // exports: safeJsonParse(row[32], null), // if you add AG later
     }));
   } catch (error) {
     console.error('Error fetching reports from Google Sheet:', error.message);
@@ -234,4 +248,3 @@ export async function getReportById(reportId) {
   const allReports = await getAllReports();
   return allReports.find((report) => report.reportId === reportId);
 }
-  
