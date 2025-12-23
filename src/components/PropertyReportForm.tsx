@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
-import { isValidUrl } from '../utils';
 import { validateReportForPdf, formatBahrainDate, printReport } from '../pdfUtils';
 import { downloadReportZip } from '../zipUtils';
 
@@ -136,9 +135,7 @@ export default function PropertyReportForm() {
       return 'يرجى كتابة تفاصيل البلاغ | Please enter complaint details';
     }
 
-    if (formData.locationLink && !isValidUrl(formData.locationLink)) {
-      return 'رابط الموقع غير صحيح | Invalid location link';
-    }
+
 
     return null;
   };

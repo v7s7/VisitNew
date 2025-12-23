@@ -95,11 +95,11 @@
 
 /* Submit section */
 .submit-section {
-  position: static; /* or just remove position */
+  position: static;
   background: white;
   padding: var(--spacing-lg);
   border-top: 2px solid var(--gray-200);
-  box-shadow: none; /* optional */
+  box-shadow: none;
   margin-top: var(--spacing-2xl);
   display: flex;
   flex-direction: column;
@@ -161,28 +161,6 @@
   transform: none;
 }
 
-.submit-button {
-  width: 100%;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  padding: var(--spacing-lg);
-  min-height: 56px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  box-shadow: var(--shadow-md);
-  gap: var(--spacing-md);
-}
-
-.submit-button:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-
-.submit-button:disabled {
-  background: var(--gray-300);
-  box-shadow: none;
-  transform: none;
-}
-
 /* Responsive improvements */
 @media (min-width: 768px) {
   .property-report-form {
@@ -204,8 +182,7 @@
   }
 
   .pdf-button,
-  .zip-button,
-  .submit-button {
+  .zip-button {
     flex: 1;
   }
 }
@@ -223,54 +200,53 @@ label:has(+ textarea[required])::after {
   font-weight: bold;
 }
 
-/* =========================
-   FIX (ONLY IF NEEDED):
-   Keep PDF DOM hidden on screen (but still printable)
-   - display:none can cause blank/changed print in some browsers
-   ========================= */
+/* Keep PDF DOM hidden on screen but NOT display:none (so print stays stable) */
 .pdf-content-hidden {
   position: fixed !important;
   left: -100000px !important;
   top: 0 !important;
-  width: 210mm !important; /* keep stable layout for print */
+  width: 210mm !important;
   background: #fff !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-/* Print styles - hide form, show PDF view */
+/* ✅ PRINT: remove layout of the whole UI to prevent extra blank pages */
 @media print {
-  /* Hide everything by default (more reliable than :not selectors) */
-  body * {
-    visibility: hidden !important;
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Show only PDF content */
-  #pdf-content,
-  #pdf-content * {
+  /* Hide all form children (removes layout, no blank pages) */
+  .property-report-form > * {
+    display: none !important;
+  }
+
+  /* Show ONLY the PDF container */
+  .property-report-form #pdf-content {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    left: auto !important;
+    top: auto !important;
     visibility: visible !important;
   }
 
-  /* Put it at the top-left for printing */
-  #pdf-content {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-  }
-
-  /* Cancel the off-screen hiding during print */
-  .pdf-content-hidden {
+  /* Ensure the hidden-class doesn't keep it hidden during print */
+  .property-report-form #pdf-content.pdf-content-hidden {
     position: static !important;
     left: auto !important;
     visibility: visible !important;
+    pointer-events: auto !important;
+    width: 100% !important;
   }
 }
 
 @media (max-width: 767px) {
   .pdf-button,
-  .zip-button,
-  .submit-button {
+  .zip-button {
     padding: var(--spacing-md);
     min-height: 44px;
     font-size: var(--text-base);
