@@ -4,6 +4,7 @@ import * as propertiesController from '../controllers/propertiesController.js';
 import * as uploadController from '../controllers/uploadController.js';
 import * as reportsController from '../controllers/reportsController.js';
 import * as authController from '../controllers/authController.js';
+import * as bundleController from '../controllers/bundleController.js';
 
 const router = express.Router();
 
@@ -36,8 +37,13 @@ const upload = multer({
 
     const subfolder = req.body.subfolder;
 
-    console.log(`   🔍 File filter check: ${file.originalname} (${file.mimetype}), subfolder: ${subfolder || 'undefined'}`);
+    console.log(
+      `   🔍 File filter check: ${file.originalname} (${file.mimetype}), subfolder: ${subfolder || 'undefined'}`
+    );
 
+    // For /api/bundle we accept whatever passed here and validate later if needed.
+    // It won't send "subfolder" the same way as /api/upload.
+    // So: accept images/docs and put anything else under Multer error for safety.
     if (!subfolder) {
       if (isImage || isDocument) {
         console.log(`   ✓ Accepted (subfolder not available, will validate in controller)`);
@@ -45,7 +51,9 @@ const upload = multer({
       } else {
         console.log(`   ✗ Rejected: unsupported file type`);
         cb(
-          new Error(`Unsupported file type: ${file.mimetype}. Allowed: images, PDFs, Word, Excel, text files`),
+          new Error(
+            `Unsupported file type: ${file.mimetype}. Allowed: images, PDFs, Word, Excel, text files`
+          ),
           false
         );
       }
@@ -59,7 +67,9 @@ const upload = multer({
       } else {
         console.log(`   ✗ Rejected: only images and documents allowed for ${subfolder}`);
         cb(
-          new Error('Only images, PDFs, Word documents, Excel files, and text files are allowed for Report Files'),
+          new Error(
+            'Only images, PDFs, Word documents, Excel files, and text files are allowed for Report Files'
+          ),
           false
         );
       }
@@ -103,6 +113,9 @@ router.get('/api/health', (req, res) => {
         exportsGenerate: 'POST /api/reports/:id/exports',
         exportsGet: 'GET /api/reports/:id/exports',
       },
+      bundle: {
+        download: 'POST /api/bundle (multipart/form-data -> returns ZIP)',
+      },
     },
   });
 });
@@ -128,5 +141,8 @@ router.get('/api/reports/:id', reportsController.getReportHandler);
 // Exports routes (PDF + ZIP uploaded to Drive)
 router.post('/api/reports/:id/exports', reportsController.generateExportsHandler);
 router.get('/api/reports/:id/exports', reportsController.getExportsHandler);
+
+// NEW: Backend bundle ZIP (PDF generated server-side + all uploaded files in folders)
+router.post('/api/bundle', upload.any(), bundleController.generateBundleHandler);
 
 export default router;

@@ -8,19 +8,30 @@ import {
 
 // Normalizes base URL and guarantees correct backend prefix:
 // - Local/proxy: RAW_BASE="/api"  -> "/api/..."
- // - Full URL:   RAW_BASE="https://visitprop.onrender.com" -> "https://visitprop.onrender.com/api/..."
+// - Full URL:   RAW_BASE="https://visitprop.onrender.com" -> "https://visitprop.onrender.com/api/..."
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').trim();
 const API_BASE_URL = RAW_BASE.replace(/\/+$/, ''); // remove trailing "/"
 
 async function parseErrorMessage(response: Response): Promise<string> {
-  let message = response.statusText;
+  let message = response.statusText || 'Request failed';
+
+  // Try JSON first
   try {
     const err = await response.json();
-    message = err?.error || err?.message || message;
-
+    message = err?.message || err?.error || message;
+    return message;
   } catch {
     // ignore
   }
+
+  // Then try plain text (some servers return text/html)
+  try {
+    const text = await response.text();
+    if (text && text.trim()) return text.trim();
+  } catch {
+    // ignore
+  }
+
   return message;
 }
 
@@ -44,10 +55,9 @@ export async function searchProperties(query: string): Promise<Property[]> {
   const q = query.trim();
   if (!q) return [];
 
-  const response = await fetch(
-    buildUrl(`/properties?search=${encodeURIComponent(q)}`),
-    { credentials: 'include' }
-  );
+  const response = await fetch(buildUrl(`/properties?search=${encodeURIComponent(q)}`), {
+    credentials: 'include',
+  });
 
   if (!response.ok) {
     const message = await parseErrorMessage(response);
@@ -69,9 +79,7 @@ export async function uploadFile(
   endowedTo: string,
   subfolder?: string
 ): Promise<UploadResponse> {
-  if (!propertyCode) {
-    throw new Error('Property code is required for upload');
-  }
+  if (!propertyCode) throw new Error('Property code is required for upload');
 
   const formData = new FormData();
   formData.append('file', file);
@@ -91,22 +99,17 @@ export async function uploadFile(
     throw new Error(`Upload failed: ${message}`);
   }
 
-  const data: UploadResponse = await response.json();
-  return data;
+  return (await response.json()) as UploadResponse;
 }
 
 /**
  * Submit a complete property report
  * POST /api/reports
  */
-export async function submitReport(
-  report: PropertyReport
-): Promise<ReportSubmitResponse> {
+export async function submitReport(report: PropertyReport): Promise<ReportSubmitResponse> {
   const response = await fetch(buildUrl('/reports'), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(report),
     credentials: 'include',
   });
@@ -116,8 +119,7 @@ export async function submitReport(
     throw new Error(`Report submission failed: ${message}`);
   }
 
-  const data: ReportSubmitResponse = await response.json();
-  return data;
+  return (await response.json()) as ReportSubmitResponse;
 }
 
 /**
@@ -127,16 +129,11 @@ export async function submitReport(
 export async function generateReportExports(reportId: string): Promise<any> {
   if (!reportId) throw new Error('reportId is required');
 
-  const response = await fetch(
-    buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`),
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    }
-  );
+  const response = await fetch(buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
 
   if (!response.ok) {
     const message = await parseErrorMessage(response);
@@ -153,10 +150,9 @@ export async function generateReportExports(reportId: string): Promise<any> {
 export async function getReportExports(reportId: string): Promise<any> {
   if (!reportId) throw new Error('reportId is required');
 
-  const response = await fetch(
-    buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`),
-    { credentials: 'include' }
-  );
+  const response = await fetch(buildUrl(`/reports/${encodeURIComponent(reportId)}/exports`), {
+    credentials: 'include',
+  });
 
   if (!response.ok) {
     const message = await parseErrorMessage(response);
@@ -164,4 +160,54 @@ export async function getReportExports(reportId: string): Promise<any> {
   }
 
   return await response.json();
+}
+
+/**
+ * NEW: Generate a single ZIP bundle on the backend:
+ * - Server-generated PDF
+ * - Photos/files grouped by section
+ * POST /api/bundle
+ *
+ * Notes:
+ * - You send the report JSON + the raw files (FormData).
+ * - Backend responds with a ZIP blob.
+ */
+export async function downloadBundleZip(
+  report: PropertyReport,
+  files: Array<{ field: string; file: File }>
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('report', JSON.stringify(report));
+
+  // attach files (field used by backend to route folders)
+  for (const item of files) {
+    formData.append(item.field, item.file);
+  }
+
+  const response = await fetch(buildUrl('/bundle'), {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const message = await parseErrorMessage(response);
+    throw new Error(`Bundle failed: ${message}`);
+  }
+
+  const blob = await response.blob();
+
+  // best-effort filename from header
+  const cd = response.headers.get('content-disposition') || '';
+  const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
+  const filenameRaw = decodeURIComponent((match?.[1] || match?.[2] || 'bundle.zip').trim());
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filenameRaw || 'bundle.zip';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

@@ -1,234 +1,203 @@
 import JSZip from 'jszip';
 import { PropertyReport } from './types';
-import {
-  sanitizeFilename,
-  getBahrainDateString,
-  generatePdfFilename,
-} from './pdfUtils';
-import html2pdf from 'html2pdf.js';
+import { sanitizeFilename, getBahrainDateString, generatePdfFilename } from './pdfUtils';
 
-/**
- * Fetch file from URL or File object and return as blob
- */
-async function getFileBlob(file: File, url?: string): Promise<Blob> {
-  if (url) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.blob();
-    } catch (error) {
-      console.warn('Failed to fetch from URL, using local file:', error);
-    }
+async function safeFetchBlob(url: string): Promise<Blob | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
   }
-  return file;
 }
 
-/**
- * Get file extension from filename or file type
- */
-function getFileExtension(file: File): string {
-  const name = file.name || '';
-  const lastDot = name.lastIndexOf('.');
-  if (lastDot > 0) return name.substring(lastDot);
+function getFileExtensionFromName(name?: string): string {
+  const n = (name || '').trim();
+  const dot = n.lastIndexOf('.');
+  return dot > 0 ? n.substring(dot) : '';
+}
 
-  const mimeType = file.type || '';
-  if (mimeType.startsWith('image/')) return '.' + mimeType.split('/')[1];
-  if (mimeType === 'application/pdf') return '.pdf';
-  if (mimeType === 'text/plain') return '.txt';
+function getFileExtensionFromMime(mime?: string): string {
+  const m = (mime || '').trim();
+  if (!m) return '';
+  if (m.startsWith('image/')) return '.' + m.split('/')[1];
+  if (m === 'application/pdf') return '.pdf';
+  if (m === 'text/plain') return '.txt';
   return '';
 }
 
-/**
- * Generate a PDF blob from the hidden DOM element (#pdf-content)
- * Uses html2pdf (html2canvas + jsPDF) without triggering print mode.
- */
-async function generatePdfBlobFromDom(
-  report: PropertyReport
-): Promise<{ blob: Blob; filename: string }> {
-  const el = document.getElementById('pdf-content') as HTMLElement | null;
-  if (!el) {
-    throw new Error('PDF content not found (element #pdf-content).');
+function safeArray<T>(v: any): T[] {
+  return Array.isArray(v) ? v : [];
+}
+
+function buildReportText(report: PropertyReport): string {
+  const lines: string[] = [];
+
+  lines.push('VisitProp Report');
+  lines.push(`Date: ${getBahrainDateString(report.submittedAt ? new Date(report.submittedAt) : new Date())}`);
+  lines.push('');
+  lines.push(`Property Code: ${report.propertyCode || ''}`);
+  lines.push(`Property Name: ${report.propertyName || ''}`);
+  lines.push(`Property ID: ${report.propertyId || ''}`);
+  lines.push('');
+  lines.push('Details:');
+  lines.push(`- Waqf Type: ${report.waqfType || ''}`);
+  lines.push(`- Property Type: ${report.propertyType || ''}`);
+  lines.push(`- Endowed To: ${report.endowedTo || ''}`);
+  lines.push(`- Building: ${report.building || ''}`);
+  lines.push(`- Unit Number: ${report.unitNumber || ''}`);
+  lines.push(`- Road: ${report.road || ''}`);
+  lines.push(`- Area: ${report.area || ''}`);
+  lines.push(`- Governorate: ${report.governorate || ''}`);
+  lines.push(`- Block: ${report.block || ''}`);
+  lines.push('');
+  lines.push('Location:');
+  lines.push(`- Description: ${report.locationDescription || ''}`);
+  lines.push(`- Link: ${report.locationLink || ''}`);
+  lines.push('');
+  lines.push('Visit:');
+  lines.push(`- Type: ${report.visitType || ''}`);
+  lines.push(`- Complaint: ${report.complaint || ''}`);
+  lines.push('');
+  lines.push('Findings:');
+  const findings = safeArray<any>(report.findings);
+  if (findings.length === 0) {
+    lines.push('- (none)');
+  } else {
+    findings.forEach((f, i) => lines.push(`- ${i + 1}) ${f?.text || ''}`));
+  }
+  lines.push('');
+  lines.push('Actions:');
+  const actions = safeArray<any>(report.actions);
+  if (actions.length === 0) {
+    lines.push('- (none)');
+  } else {
+    actions.forEach((a, i) => lines.push(`- ${i + 1}) ${a?.text || ''}`));
   }
 
-  // IMPORTANT: if your CSS uses display:none, canvas capture may be blank.
-  // So we temporarily render it offscreen.
-  const prev = {
-    display: el.style.display,
-    position: el.style.position,
-    left: el.style.left,
-    top: el.style.top,
-    width: el.style.width,
-    height: el.style.height,
-    opacity: el.style.opacity,
-    pointerEvents: el.style.pointerEvents,
-    zIndex: el.style.zIndex,
-  };
-
-  el.style.display = 'block';
-  el.style.position = 'fixed';
-  el.style.left = '-99999px';
-  el.style.top = '0';
-  el.style.width = '794px'; // ~A4 width at 96dpi (helps stability)
-  el.style.height = 'auto';
-  el.style.opacity = '1';
-  el.style.pointerEvents = 'none';
-  el.style.zIndex = '0';
-
-  try {
-    // Let layout settle before capture
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-
-    const filename = generatePdfFilename(report);
-
-    const opt = {
-      margin: 10,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    };
-
-    // html2pdf types are loose; treat worker as any
-    const worker = (html2pdf() as any).set(opt).from(el);
-
-    // outputPdf('blob') gives a Blob
-    const blob: Blob = await worker.outputPdf('blob');
-
-    return { blob, filename };
-  } finally {
-    el.style.display = prev.display;
-    el.style.position = prev.position;
-    el.style.left = prev.left;
-    el.style.top = prev.top;
-    el.style.width = prev.width;
-    el.style.height = prev.height;
-    el.style.opacity = prev.opacity;
-    el.style.pointerEvents = prev.pointerEvents;
-    el.style.zIndex = prev.zIndex;
-  }
+  return lines.join('\n');
 }
 
 /**
- * Download all uploaded files from a property report as a ZIP file
- * PLUS: include a generated PDF report inside the ZIP
+ * Download report bundle as ZIP (never crashes).
+ * Includes:
+ * - Report.txt
+ * - Report.json
+ * - (optional) photos/files if present
+ *
+ * NOTE: Browser cannot automatically "save PDF then inject into ZIP".
+ * If you want PDF inside ZIP, you must generate PDF as a Blob (jsPDF/html2pdf)
+ * or generate it on backend. For now we include filenames + metadata safely.
  */
 export async function downloadReportZip(report: PropertyReport): Promise<void> {
   const zip = new JSZip();
-  let fileCount = 0;
 
-  // ----------------------------
-  // 1) Add PDF inside ZIP
-  // ----------------------------
-  {
-    const pdfFolder = zip.folder('PDF Report');
-    const { blob, filename } = await generatePdfBlobFromDom(report);
-    pdfFolder?.file(filename, blob);
-    fileCount++;
-  }
+  // Always add report metadata so ZIP is never empty.
+  zip.file('Report.txt', buildReportText(report));
+  zip.file('Report.json', JSON.stringify(report, null, 2));
 
-  // ----------------------------
-  // 2) Add main photos
-  // ----------------------------
-  if (report.mainPhotos.length > 0) {
-    const mainPhotosFolder = zip.folder('Main Photos');
-    if (mainPhotosFolder) {
-      for (let i = 0; i < report.mainPhotos.length; i++) {
-        const photo = report.mainPhotos[i];
-        if (photo.uploadedUrl || photo.file) {
-          try {
-            const blob = await getFileBlob(photo.file, photo.uploadedUrl);
-            const ext = getFileExtension(photo.file);
-            const fileName = `Main Photo ${i + 1}${ext}`;
-            mainPhotosFolder.file(fileName, blob);
-            fileCount++;
-          } catch (error) {
-            console.error(`Failed to add main photo ${i + 1}:`, error);
-          }
-        }
+  // Add a note about PDF filename (helpful even without generating a PDF blob)
+  zip.file(
+    'PDF_FILENAME_SUGGESTION.txt',
+    `Suggested PDF filename:\n${generatePdfFilename(report)}\n\nTo include an actual PDF inside ZIP, generate PDF as a Blob (client-side) or via backend.`
+  );
+
+  // Main Photos
+  const mainPhotos = safeArray<any>(report.mainPhotos);
+  if (mainPhotos.length > 0) {
+    const folder = zip.folder('Main Photos');
+    if (folder) {
+      for (let i = 0; i < mainPhotos.length; i++) {
+        const p = mainPhotos[i];
+        const url: string | undefined = p?.uploadedUrl;
+        const file: File | undefined = p?.file;
+
+        const blob =
+          (url ? await safeFetchBlob(url) : null) ||
+          (file ? file : null);
+
+        if (!blob) continue;
+
+        const ext =
+          getFileExtensionFromName(file?.name) ||
+          getFileExtensionFromMime((blob as any)?.type) ||
+          '.bin';
+
+        folder.file(`Main Photo ${i + 1}${ext}`, blob);
       }
     }
   }
 
-  // ----------------------------
-  // 3) Add finding photos
-  // ----------------------------
-  if (report.findings.length > 0) {
-    const findingsRoot = zip.folder('Findings');
-    for (let findingIndex = 0; findingIndex < report.findings.length; findingIndex++) {
-      const finding = report.findings[findingIndex];
-      if (finding.photos.length > 0) {
-        const findingNumber = findingIndex + 1;
-        const findingDescription = (finding.text || '').substring(0, 50).trim();
-        const folderName = sanitizeFilename(`Finding ${findingNumber} - ${findingDescription || 'No Description'}`);
+  // Finding Photos
+  const findings = safeArray<any>(report.findings);
+  for (let fi = 0; fi < findings.length; fi++) {
+    const f = findings[fi];
+    const photos = safeArray<any>(f?.photos);
+    if (photos.length === 0) continue;
 
-        const findingFolder = findingsRoot?.folder(folderName);
-        if (findingFolder) {
-          for (let photoIndex = 0; photoIndex < finding.photos.length; photoIndex++) {
-            const photo = finding.photos[photoIndex];
-            if (photo.uploadedUrl || photo.file) {
-              try {
-                const blob = await getFileBlob(photo.file, photo.uploadedUrl);
-                const ext = getFileExtension(photo.file);
-                const fileName = `Photo ${photoIndex + 1}${ext}`;
-                findingFolder.file(fileName, blob);
-                fileCount++;
-              } catch (error) {
-                console.error(
-                  `Failed to add finding ${findingNumber} photo ${photoIndex + 1}:`,
-                  error
-                );
-              }
-            }
-          }
-        }
+    const findingNumber = fi + 1;
+    const desc = String(f?.text || '').substring(0, 50).trim();
+    const folderName = sanitizeFilename(`Finding ${findingNumber} - ${desc || 'No Description'}`);
+    const folder = zip.folder(folderName);
+    if (!folder) continue;
+
+    for (let pi = 0; pi < photos.length; pi++) {
+      const p = photos[pi];
+      const url: string | undefined = p?.uploadedUrl;
+      const file: File | undefined = p?.file;
+
+      const blob =
+        (url ? await safeFetchBlob(url) : null) ||
+        (file ? file : null);
+
+      if (!blob) continue;
+
+      const ext =
+        getFileExtensionFromName(file?.name) ||
+        getFileExtensionFromMime((blob as any)?.type) ||
+        '.bin';
+
+      folder.file(`Photo ${pi + 1}${ext}`, blob);
+    }
+  }
+
+  // Complaint Files
+  const complaintFiles = safeArray<any>(report.complaintFiles);
+  if (complaintFiles.length > 0) {
+    const folder = zip.folder('Complaint Files');
+    if (folder) {
+      for (let i = 0; i < complaintFiles.length; i++) {
+        const f = complaintFiles[i];
+        const url: string | undefined = f?.uploadedUrl;
+        const file: File | undefined = f?.file;
+        const name: string = f?.name || file?.name || `Complaint File ${i + 1}`;
+
+        const blob =
+          (url ? await safeFetchBlob(url) : null) ||
+          (file ? file : null);
+
+        if (!blob) continue;
+
+        const ext =
+          getFileExtensionFromName(name) ||
+          getFileExtensionFromName(file?.name) ||
+          getFileExtensionFromMime((blob as any)?.type) ||
+          '.bin';
+
+        folder.file(sanitizeFilename(name.replace(/\.[^/.]+$/, '') + ext), blob);
       }
     }
   }
 
-  // ----------------------------
-  // 4) Add complaint files
-  // ----------------------------
-  if (report.complaintFiles.length > 0) {
-    const complaintFolder = zip.folder('Complaint Files');
-    if (complaintFolder) {
-      for (let i = 0; i < report.complaintFiles.length; i++) {
-        const file = report.complaintFiles[i];
-        if (file.uploadedUrl || file.file) {
-          try {
-            const blob = await getFileBlob(file.file, file.uploadedUrl);
-            const fileName = sanitizeFilename(file.name || `Complaint File ${i + 1}${getFileExtension(file.file)}`);
-            complaintFolder.file(fileName, blob);
-            fileCount++;
-          } catch (error) {
-            console.error(`Failed to add complaint file ${i + 1}:`, error);
-          }
-        }
-      }
-    }
-  }
-
-  // Must have at least the PDF (we always add it if pdf-content exists)
-  if (fileCount === 0) {
-    throw new Error('لا توجد ملفات للتحميل | No files to download');
-  }
-
-  // ----------------------------
-  // 5) Generate ZIP file
-  // ----------------------------
   const zipBlob = await zip.generateAsync({
     type: 'blob',
     compression: 'DEFLATE',
     compressionOptions: { level: 6 },
   });
 
-  // ZIP file name
-  const dateString = report.submittedAt
-    ? getBahrainDateString(new Date(report.submittedAt))
-    : getBahrainDateString();
-
-  const zipFileName = sanitizeFilename(
-    `${report.propertyCode} - ${report.propertyName} - ${dateString}.zip`
-  );
+  const dateString = getBahrainDateString(report.submittedAt ? new Date(report.submittedAt) : new Date());
+  const zipFileName = sanitizeFilename(`${report.propertyCode || 'Report'} - ${report.propertyName || 'Property'} - ${dateString}.zip`);
 
   const url = URL.createObjectURL(zipBlob);
   const link = document.createElement('a');
@@ -238,28 +207,12 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-
-  console.log(`✅ ZIP file downloaded: ${fileCount} files`);
 }
 
 /**
- * Validate if report has files to download
- * NOTE: PDF is generated from DOM; we validate that the report exists and a property is selected.
+ * Make everything optional: only require selecting a property (report object).
  */
 export function validateReportForZip(report: PropertyReport | null): string | null {
-  if (!report) {
-    return 'يرجى اختيار عقار أولاً | Please select a property first';
-  }
-
-  // We always include PDF (if #pdf-content exists), so allow ZIP even if no files.
-  // But if you want to enforce photos/files, uncomment below:
-  //
-  // const hasMainPhotos = report.mainPhotos.length > 0;
-  // const hasFindingPhotos = report.findings.some((f) => f.photos.length > 0);
-  // const hasComplaintFiles = report.complaintFiles.length > 0;
-  // if (!hasMainPhotos && !hasFindingPhotos && !hasComplaintFiles) {
-  //   return 'لا توجد ملفات لتحميلها | No files to download';
-  // }
-
+  if (!report) return 'يرجى اختيار عقار أولاً | Please select a property first';
   return null;
 }
