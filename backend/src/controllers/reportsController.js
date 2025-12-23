@@ -1,6 +1,23 @@
 import * as reportsService from '../services/reportsService.js';
 import * as exportsService from '../services/exportsService.js';
 
+function safeMsg(err) {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (err.message) return err.message;
+  return String(err);
+}
+
+function safeDetails(err) {
+  // Prefer Google API error details when available
+  return (
+    err?.response?.data ||
+    err?.errors ||
+    err?.stack ||
+    undefined
+  );
+}
+
 /**
  * Submit a new report
  * POST /api/reports
@@ -10,14 +27,14 @@ export async function submitReportHandler(req, res) {
     const report = req.body;
 
     // Validate required fields
-    if (!report.propertyId || !report.propertyCode) {
+    if (!report?.propertyId || !report?.propertyCode) {
       return res.status(400).json({
         success: false,
         message: 'Property information is required',
       });
     }
 
-    if (!report.visitType) {
+    if (!report?.visitType) {
       return res.status(400).json({
         success: false,
         message: 'Visit type is required',
@@ -25,27 +42,31 @@ export async function submitReportHandler(req, res) {
     }
 
     // Complaint is only required for complaint visits
-    if (report.visitType === 'complaint' && !report.complaint) {
+    if (report.visitType === 'complaint' && !report?.complaint) {
       return res.status(400).json({
         success: false,
         message: 'Complaint is required for complaint visits',
       });
     }
 
+    // Save report (Sheets/DB layer)
     const result = await reportsService.saveReport(report);
 
-    res.json({
+    return res.json({
       success: true,
-      reportId: result.reportId,
+      reportId: result?.reportId,
       message: 'Report submitted successfully',
-      exportsEndpoint: `/api/reports/${result.reportId}/exports`,
+      exportsEndpoint: result?.reportId ? `/api/reports/${result.reportId}/exports` : undefined,
     });
   } catch (error) {
-    console.error('Submit report error:', error);
-    res.status(500).json({
+    const msg = safeMsg(error);
+    console.error('Submit report error (full):', error);
+
+    return res.status(500).json({
       success: false,
       message: 'Failed to submit report',
-      error: error.message,
+      error: msg,              // IMPORTANT: surfaced to frontend (your api.ts reads message, but you can swap to error)
+      details: safeDetails(error), // Helpful for Render logs / debugging
     });
   }
 }
@@ -62,15 +83,18 @@ export async function getReportsHandler(req, res) {
       ? await reportsService.getReportsByPropertyCode(propertyCode)
       : await reportsService.getAllReports();
 
-    res.json({
+    return res.json({
       reports,
       total: reports.length,
     });
   } catch (error) {
-    console.error('Get reports error:', error);
-    res.status(500).json({
+    const msg = safeMsg(error);
+    console.error('Get reports error (full):', error);
+
+    return res.status(500).json({
       error: 'Failed to fetch reports',
-      message: error.message,
+      message: msg,
+      details: safeDetails(error),
     });
   }
 }
@@ -82,6 +106,7 @@ export async function getReportsHandler(req, res) {
 export async function getReportHandler(req, res) {
   try {
     const { id } = req.params;
+
     const report = await reportsService.getReportById(id);
 
     if (!report) {
@@ -90,12 +115,15 @@ export async function getReportHandler(req, res) {
       });
     }
 
-    res.json(report);
+    return res.json(report);
   } catch (error) {
-    console.error('Get report error:', error);
-    res.status(500).json({
+    const msg = safeMsg(error);
+    console.error('Get report error (full):', error);
+
+    return res.status(500).json({
       error: 'Failed to fetch report',
-      message: error.message,
+      message: msg,
+      details: safeDetails(error),
     });
   }
 }
@@ -118,18 +146,21 @@ export async function generateExportsHandler(req, res) {
 
     const exportsResult = await exportsService.generateAndUploadExports(report);
 
-    res.json({
+    return res.json({
       success: true,
       reportId: id,
       exports: exportsResult,
       message: 'Exports generated successfully',
     });
   } catch (error) {
-    console.error('Generate exports error:', error);
-    res.status(500).json({
+    const msg = safeMsg(error);
+    console.error('Generate exports error (full):', error);
+
+    return res.status(500).json({
       success: false,
       message: 'Failed to generate exports',
-      error: error.message,
+      error: msg,
+      details: safeDetails(error),
     });
   }
 }
@@ -152,17 +183,20 @@ export async function getExportsHandler(req, res) {
 
     const exportsInfo = await exportsService.getExistingExports(report);
 
-    res.json({
+    return res.json({
       success: true,
       reportId: id,
       exports: exportsInfo,
     });
   } catch (error) {
-    console.error('Get exports error:', error);
-    res.status(500).json({
+    const msg = safeMsg(error);
+    console.error('Get exports error (full):', error);
+
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch exports',
-      error: error.message,
+      error: msg,
+      details: safeDetails(error),
     });
   }
 }

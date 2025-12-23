@@ -95,19 +95,17 @@
 
 /* Submit section */
 .submit-section {
-  position: sticky;
-  bottom: 0;
+  position: static; /* or just remove position */
   background: white;
   padding: var(--spacing-lg);
   border-top: 2px solid var(--gray-200);
-  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-  margin: 0 calc(var(--spacing-md) * -1);
+  box-shadow: none; /* optional */
   margin-top: var(--spacing-2xl);
-  z-index: 10;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
 }
+
 
 .pdf-button,
 .zip-button {
@@ -242,5 +240,14 @@ label:has(+ textarea[required])::after {
   .pdf-content-hidden {
     display: block !important;
     position: static !important;
+  }
+}
+@media (max-width: 767px) {
+  .pdf-button,
+  .zip-button,
+  .submit-button {
+    padding: var(--spacing-md);
+    min-height: 44px;
+    font-size: var(--text-base);
   }
 }
