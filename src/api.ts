@@ -17,16 +17,16 @@ async function parseErrorMessage(response: Response): Promise<string> {
 
   // Try JSON first
   try {
-    const err = await response.json();
+    const err = await response.clone().json();
     message = err?.message || err?.error || message;
     return message;
   } catch {
     // ignore
   }
 
-  // Then try plain text (some servers return text/html)
+  // Then try plain text
   try {
-    const text = await response.text();
+    const text = await response.clone().text();
     if (text && text.trim()) return text.trim();
   } catch {
     // ignore
@@ -42,7 +42,6 @@ function buildUrl(path: string): string {
   if (API_BASE_URL === '/api') return `${API_BASE_URL}${p}`;
 
   // Full URL base: must always include "/api"
-  // and avoid double slashes.
   const apiPath = p.startsWith('/api/') ? p : `/api${p}`;
   return `${API_BASE_URL}${apiPath}`;
 }
@@ -169,8 +168,9 @@ export async function getReportExports(reportId: string): Promise<any> {
  * POST /api/bundle
  *
  * Notes:
- * - You send the report JSON + the raw files (FormData).
+ * - You send the report JSON + raw files (FormData).
  * - Backend responds with a ZIP blob.
+ * - This function ONLY downloads (no navigation), so no white screen.
  */
 export async function downloadBundleZip(
   report: PropertyReport,
@@ -179,9 +179,10 @@ export async function downloadBundleZip(
   const formData = new FormData();
   formData.append('report', JSON.stringify(report));
 
-  // attach files (field used by backend to route folders)
   for (const item of files) {
-    formData.append(item.field, item.file);
+    // Backend uses multer.any(), so any field names are accepted.
+    // Keep field names meaningful (e.g., "mainPhotos", "findingPhotos_1", "complaintFiles").
+    formData.append(item.field, item.file, item.file.name);
   }
 
   const response = await fetch(buildUrl('/bundle'), {
@@ -197,17 +198,22 @@ export async function downloadBundleZip(
 
   const blob = await response.blob();
 
-  // best-effort filename from header
+  // Best-effort filename from header
   const cd = response.headers.get('content-disposition') || '';
   const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
   const filenameRaw = decodeURIComponent((match?.[1] || match?.[2] || 'bundle.zip').trim());
+  const filename = filenameRaw && filenameRaw.toLowerCase().endsWith('.zip') ? filenameRaw : 'bundle.zip';
 
+  // Download without changing page (prevents white screen)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+  a.style.display = 'none';
   a.href = url;
-  a.download = filenameRaw || 'bundle.zip';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+
+  // Revoke a bit later to avoid cutting off download in some browsers
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
