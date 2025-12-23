@@ -16,7 +16,8 @@ async function parseErrorMessage(response: Response): Promise<string> {
   let message = response.statusText;
   try {
     const err = await response.json();
-    message = err?.message || err?.error || message;
+    message = err?.error || err?.message || message;
+
   } catch {
     // ignore
   }
