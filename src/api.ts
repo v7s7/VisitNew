@@ -6,9 +6,9 @@ import {
   UploadResponse,
 } from './types';
 
-// Normalize base URL to avoid double slashes and to support full URLs like:
-// https://visitprop.onrender.com
-// Also supports proxy-style base like "/api" for local/proxy setups.
+// Normalizes base URL and guarantees correct backend prefix:
+// - Local/proxy: RAW_BASE="/api"  -> "/api/..."
+ // - Full URL:   RAW_BASE="https://visitprop.onrender.com" -> "https://visitprop.onrender.com/api/..."
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').trim();
 const API_BASE_URL = RAW_BASE.replace(/\/+$/, ''); // remove trailing "/"
 
@@ -26,12 +26,11 @@ async function parseErrorMessage(response: Response): Promise<string> {
 function buildUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`;
 
-  // If base is "/api", then "/api" + "/properties" => "/api/properties"
-  // If base is "https://visitprop.onrender.com", we MUST hit "/api/..." routes on backend:
-  // "https://visitprop.onrender.com" + "/api/properties" => full URL
+  // Proxy-style base: "/api" + "/properties" => "/api/properties"
   if (API_BASE_URL === '/api') return `${API_BASE_URL}${p}`;
 
-  // For full backend base URL, ensure we include /api prefix
+  // Full URL base: must always include "/api"
+  // and avoid double slashes.
   const apiPath = p.startsWith('/api/') ? p : `/api${p}`;
   return `${API_BASE_URL}${apiPath}`;
 }
