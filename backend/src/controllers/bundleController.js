@@ -1,6 +1,6 @@
 import * as bundleService from '../services/bundleService.js';
 
-export async function generateBundleHandler(req, res, next) {
+export async function generateBundleHandler(req, res) {
   try {
     const reportJson = req.body?.report;
 
@@ -14,7 +14,7 @@ export async function generateBundleHandler(req, res, next) {
     let report;
     try {
       report = JSON.parse(reportJson);
-    } catch (e) {
+    } catch {
       return res.status(400).json({
         success: false,
         message: 'Invalid report JSON',
@@ -31,10 +31,10 @@ export async function generateBundleHandler(req, res, next) {
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
-    res.status(200).send(zipBuffer);
+    return res.status(200).send(zipBuffer);
   } catch (error) {
     console.error('Bundle generation error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to generate bundle',
       error: error.message,

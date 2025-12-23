@@ -9,11 +9,15 @@ import { validateConfig } from './config/google-hybrid.js';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 8080;
 
 // CORS
-// - Fixes: your server was sending Access-Control-Allow-Origin: http://localhost:3000
-// - Now: allows the Vercel domain + localhost (and optional extra origins via FRONTEND_URL / FRONTEND_URLS)
+// Allows:
+// - localhost
+// - your main Vercel domain
+// - ANY Vercel preview domain (*.vercel.app) so ZIP/Print won’t break on new deployments
 const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -29,11 +33,24 @@ const envOrigins = [
 
 const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // server-to-server / curl
+  if (allowedOrigins.includes(origin)) return true;
+
+  // Allow all Vercel preview deployments
+  try {
+    const u = new URL(origin);
+    if (u.hostname.endsWith('.vercel.app')) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin) return cb(null, true); // allow server-to-server / curl
-      if (allowedOrigins.includes(origin)) return cb(null, true);
+      if (isAllowedOrigin(origin)) return cb(null, true);
       return cb(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
@@ -135,12 +152,10 @@ app.use((req, res) => {
 // Start server
 async function startServer() {
   try {
-    // Validate configuration
     console.log('🔍 Validating configuration...');
     validateConfig();
     console.log('✅ Configuration valid');
 
-    // Start listening
     app.listen(PORT, () => {
       console.log('');
       console.log('🚀 ========================================');
@@ -154,14 +169,11 @@ async function startServer() {
       console.log(`   POST http://localhost:${PORT}/api/upload`);
       console.log(`   POST http://localhost:${PORT}/api/reports`);
       console.log(`   GET  http://localhost:${PORT}/api/reports`);
+      console.log(`   POST http://localhost:${PORT}/api/bundle`);
       console.log('');
       console.log('🌐 CORS Allowed Origins:');
       allowedOrigins.forEach((o) => console.log(`   ✅ ${o}`));
-      console.log('');
-      console.log('🔗 Connected Services:');
-      console.log(`   📊 Properties Sheet: ${process.env.GOOGLE_SHEETS_PROPERTIES_ID}`);
-      console.log(`   📋 Reports Sheet: ${process.env.GOOGLE_SHEETS_REPORTS_ID}`);
-      console.log(`   📁 Drive Folder: ${process.env.GOOGLE_DRIVE_FOLDER_ID}`);
+      console.log('   ✅ *.vercel.app (preview deployments)');
       console.log('');
       console.log('✨ Ready to accept requests!');
       console.log('');
@@ -169,12 +181,6 @@ async function startServer() {
   } catch (error) {
     console.error('❌ Failed to start server:');
     console.error(error.message);
-    console.error('');
-    console.error('Please check:');
-    console.error('  1. Your .env file exists and has all required variables');
-    console.error('  2. Your google-credentials.json file exists');
-    console.error('  3. Your Google Sheets and Drive IDs are correct');
-    console.error('');
     process.exit(1);
   }
 }

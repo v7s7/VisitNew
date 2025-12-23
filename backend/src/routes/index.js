@@ -43,7 +43,6 @@ const upload = multer({
 
     // For /api/bundle we accept whatever passed here and validate later if needed.
     // It won't send "subfolder" the same way as /api/upload.
-    // So: accept images/docs and put anything else under Multer error for safety.
     if (!subfolder) {
       if (isImage || isDocument) {
         console.log(`   ✓ Accepted (subfolder not available, will validate in controller)`);
@@ -127,7 +126,7 @@ router.get('/auth/callback', authController.handleCallback);
 router.get('/auth/status', authController.checkStatus);
 router.post('/auth/logout', authController.logout);
 
-// API routes - mounted at /api
+// API routes
 router.get('/api/properties', propertiesController.searchPropertiesHandler);
 router.get('/api/properties/:id', propertiesController.getPropertyHandler);
 
@@ -138,11 +137,10 @@ router.post('/api/reports', reportsController.submitReportHandler);
 router.get('/api/reports', reportsController.getReportsHandler);
 router.get('/api/reports/:id', reportsController.getReportHandler);
 
-// Exports routes (PDF + ZIP uploaded to Drive)
 router.post('/api/reports/:id/exports', reportsController.generateExportsHandler);
 router.get('/api/reports/:id/exports', reportsController.getExportsHandler);
 
-// NEW: Backend bundle ZIP (PDF generated server-side + all uploaded files in folders)
+// Backend bundle ZIP (PDF + all uploaded files in folders)
 router.post('/api/bundle', upload.any(), bundleController.generateBundleHandler);
 
 export default router;

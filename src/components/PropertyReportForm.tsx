@@ -40,6 +40,101 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
   );
 }
 
+function safeStr(v: any) {
+  return v === undefined || v === null ? '' : String(v);
+}
+
+function sanitizeFilename(name: string) {
+  return safeStr(name)
+    .replace(/[/\\<>:"|?*]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildPdfFileName(report: PropertyReport) {
+  const dateStr = formatBahrainDate(); // already Bahrain date formatted in your utils
+  const code = sanitizeFilename(report.propertyCode || 'Report');
+  const prop = sanitizeFilename(report.propertyName || 'Property');
+  return `${code} - ${prop} - ${dateStr}.pdf`;
+}
+
+/**
+ * Creates a PDF from the same DOM used by Print (#pdf-content),
+ * by opening a temporary print window, then printing to PDF is still user-driven,
+ * BUT we also capture a real PDF Blob using browser print rendering:
+ *
+ * We generate a PDF using the existing "Print view" HTML rendered in the hidden container.
+ * Implementation: open a new window with the PDF HTML and use the browser to render it,
+ * then capture as PDF blob via built-in "print to PDF" is not programmatically accessible.
+ *
+ * So instead we use html2canvas + jsPDF ONLY for ZIP attachment while keeping Print unchanged.
+ * That ensures ZIP PDF looks identical to the print view and never white.
+ */
+async function generatePdfBlobFromDom(): Promise<Blob> {
+  const el = document.getElementById('pdf-content');
+  if (!el) throw new Error('PDF content not found');
+
+  const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ]);
+
+  // Make sure it is visible for capture
+  const prevClass = el.className;
+  el.className = prevClass.replace('pdf-content-hidden', '').trim();
+
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight,
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+
+    // A4
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Fit image to page width; paginate by slicing height
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgWidth = pageWidth;
+    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+    let y = 0;
+    let remaining = imgHeight;
+
+    while (remaining > 0) {
+      pdf.addImage(imgData, 'PNG', 0, y, imgWidth, imgHeight);
+
+      remaining -= pageHeight;
+
+      if (remaining > 0) {
+        pdf.addPage();
+        y -= pageHeight; // shift up for next page
+      }
+    }
+
+    const blob = pdf.output('blob');
+    return blob;
+  } finally {
+    // restore hidden
+    if (!prevClass.includes('pdf-content-hidden')) {
+      // if it wasn't hidden before, keep it
+      el.className = prevClass;
+    } else {
+      el.className = prevClass;
+    }
+  }
+}
+
 export default function PropertyReportForm() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
@@ -128,7 +223,6 @@ export default function PropertyReportForm() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Soft validation: only what's logically required
   const validateForExport = (): string | null => {
     if (!selectedProperty) return 'يرجى اختيار العقار | Please select a property';
     if (!formData.visitType.trim()) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
@@ -181,7 +275,6 @@ export default function PropertyReportForm() {
     };
   };
 
-  // Print after DOM is ready (reduces blank print)
   useEffect(() => {
     if (!printQueued) return;
 
@@ -193,7 +286,6 @@ export default function PropertyReportForm() {
       }
 
       try {
-        // Ensure the hidden PDF content is mounted before printing
         await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
         const validationError = validateReportForPdf(currentReport);
@@ -259,6 +351,20 @@ export default function PropertyReportForm() {
     setZipError(null);
 
     try {
+      // Ensure PDF DOM exists and is up-to-date
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+      const pdfValidationError = validateReportForPdf(currentReport);
+      if (pdfValidationError) {
+        setZipError(pdfValidationError);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Generate PDF blob from the same print DOM
+      const reportPdfBlob = await generatePdfBlobFromDom();
+      const reportPdfFileName = buildPdfFileName(currentReport);
+
       // Build files payload for backend bundle (PDF + folders)
       const filesPayload: Array<{ field: string; file: File }> = [];
 
@@ -272,15 +378,18 @@ export default function PropertyReportForm() {
         if (f?.file) filesPayload.push({ field: 'complaintFiles', file: f.file });
       }
 
-      // Findings photos (keep finding index in field name so backend can folderize)
+      // Findings photos (0-based + double underscore, matches backend)
       findings.forEach((finding, idx) => {
-        const field = `findingPhotos_${idx + 1}`;
+        const field = `findingPhotos__${idx}`;
         (finding.photos || []).forEach((p) => {
           if (p?.file) filesPayload.push({ field, file: p.file });
         });
       });
 
-      await downloadBundleZip(currentReport, filesPayload);
+      await downloadBundleZip(currentReport, filesPayload, {
+        reportPdf: reportPdfBlob,
+        reportPdfFileName,
+      });
     } catch (error: any) {
       console.error('ZIP download error:', error);
       setZipError(error.message || 'فشل تحميل الملف. حاول مرة أخرى. | Failed to download ZIP. Try again.');

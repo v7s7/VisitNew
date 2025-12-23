@@ -24,27 +24,66 @@ function getBahrainDateString(date = new Date()) {
 }
 
 function buildZipName(report) {
-  const dateStr = report?.submittedAt ? getBahrainDateString(new Date(report.submittedAt)) : getBahrainDateString();
+  const dateStr = report?.submittedAt
+    ? getBahrainDateString(new Date(report.submittedAt))
+    : getBahrainDateString();
   const code = sanitizeFileName(report?.propertyCode || 'Report');
   const name = sanitizeFileName(report?.propertyName || 'Property');
   return `${code} - ${name} - ${dateStr}.zip`;
 }
 
+function pickUploadedPdf(files) {
+  const f = (files || []).find(
+    (x) => x?.fieldname === 'reportPdf' && x?.mimetype === 'application/pdf' && x?.buffer?.length
+  );
+  return f?.buffer || null;
+}
+
+function parseFindingIndex(field) {
+  // Supports:
+  // - findingPhotos__0 (zero-based)
+  // - findingPhotos_1 (one-based legacy)
+  if (field.startsWith('findingPhotos__')) {
+    const idxRaw = field.split('__')[1];
+    const idx = Number(idxRaw);
+    return Number.isFinite(idx) ? idx : null;
+  }
+
+  if (field.startsWith('findingPhotos_')) {
+    const idxRaw = field.split('_')[1];
+    const oneBased = Number(idxRaw);
+    if (!Number.isFinite(oneBased)) return null;
+    return Math.max(0, oneBased - 1);
+  }
+
+  return null;
+}
+
 /**
  * Expected frontend file fields:
+ * - reportPdf (single)  <-- client-generated PDF (same as Print -> Save as PDF)
  * - mainPhotos (multiple)
- * - findingPhotos__<index> (multiple)  e.g. findingPhotos__0, findingPhotos__1
+ * - findingPhotos__<index> (multiple) OR findingPhotos_<index+1> (legacy)
  * - complaintFiles (multiple)
- *
- * Multer file object: { fieldname, originalname, buffer, mimetype }
  */
 export async function generateZipBundle({ report, files }) {
   const zip = new JSZip();
 
-  // 1) Generate PDF (server-side) and add it to ZIP
-  const pdfBuffer = await generatePdfBuffer(report);
-  const dateStr = report?.submittedAt ? getBahrainDateString(new Date(report.submittedAt)) : getBahrainDateString();
-  const pdfName = sanitizeFileName(`${report?.propertyCode || 'Report'} - ${report?.propertyName || 'Property'} - ${dateStr}.pdf`);
+  // 1) Add PDF to ZIP:
+  // Prefer client PDF (same as Print), fallback to Playwright
+  let pdfBuffer = pickUploadedPdf(files);
+  if (!pdfBuffer) {
+    pdfBuffer = await generatePdfBuffer(report);
+  }
+
+  const dateStr = report?.submittedAt
+    ? getBahrainDateString(new Date(report.submittedAt))
+    : getBahrainDateString();
+
+  const pdfName = sanitizeFileName(
+    `${report?.propertyCode || 'Report'} - ${report?.propertyName || 'Property'} - ${dateStr}.pdf`
+  );
+
   zip.folder('PDF')?.file(pdfName, pdfBuffer);
 
   // 2) Add metadata
@@ -57,10 +96,15 @@ export async function generateZipBundle({ report, files }) {
 
   const findings = Array.isArray(report?.findings) ? report.findings : [];
 
-  for (const f of files) {
+  for (const f of files || []) {
     const field = f.fieldname || '';
     const original = sanitizeFileName(f.originalname || 'file');
     const buf = f.buffer;
+
+    if (!buf || !buf.length) continue;
+
+    // Skip the uploaded PDF attachment itself (already placed in PDF folder)
+    if (field === 'reportPdf') continue;
 
     if (field === 'mainPhotos') {
       mainFolder?.file(original, buf);
@@ -72,13 +116,14 @@ export async function generateZipBundle({ report, files }) {
       continue;
     }
 
-    // findingPhotos__0, findingPhotos__1, ...
-    if (field.startsWith('findingPhotos__')) {
-      const idxRaw = field.split('__')[1];
-      const idx = Number(idxRaw);
-      const findingNumber = Number.isFinite(idx) ? idx + 1 : 0;
+    const idx = parseFindingIndex(field);
+    if (idx !== null) {
+      const findingNumber = idx + 1;
 
-      const findingText = safeStr(findings?.[idx]?.text || '').substring(0, 50).trim();
+      const findingText = safeStr(findings?.[idx]?.text || '')
+        .substring(0, 50)
+        .trim();
+
       const folderName = sanitizeFileName(`Finding ${findingNumber} - ${findingText || 'No Description'}`);
 
       findingsRoot?.folder(folderName)?.file(original, buf);

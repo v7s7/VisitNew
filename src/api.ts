@@ -162,26 +162,32 @@ export async function getReportExports(reportId: string): Promise<any> {
 }
 
 /**
- * NEW: Generate a single ZIP bundle on the backend:
- * - Server-generated PDF
+ * Generate a single ZIP bundle on the backend:
+ * - PDF (prefer client "Print -> Save" PDF if provided)
  * - Photos/files grouped by section
  * POST /api/bundle
  *
  * Notes:
- * - You send the report JSON + raw files (FormData).
- * - Backend responds with a ZIP blob.
- * - This function ONLY downloads (no navigation), so no white screen.
+ * - Send report JSON + raw files (FormData)
+ * - Backend responds with ZIP blob
+ * - Downloads without navigation (prevents white screen)
  */
 export async function downloadBundleZip(
   report: PropertyReport,
-  files: Array<{ field: string; file: File }>
+  files: Array<{ field: string; file: File }>,
+  opts?: { reportPdf?: Blob; reportPdfFileName?: string }
 ): Promise<void> {
   const formData = new FormData();
   formData.append('report', JSON.stringify(report));
 
+  // IMPORTANT: if you generate the PDF on the client (same as Print),
+  // attach it here so backend puts this exact PDF inside the ZIP.
+  if (opts?.reportPdf) {
+    const pdfName = (opts.reportPdfFileName || 'report.pdf').trim() || 'report.pdf';
+    formData.append('reportPdf', opts.reportPdf, pdfName);
+  }
+
   for (const item of files) {
-    // Backend uses multer.any(), so any field names are accepted.
-    // Keep field names meaningful (e.g., "mainPhotos", "findingPhotos_1", "complaintFiles").
     formData.append(item.field, item.file, item.file.name);
   }
 
@@ -214,6 +220,5 @@ export async function downloadBundleZip(
   a.click();
   a.remove();
 
-  // Revoke a bit later to avoid cutting off download in some browsers
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
