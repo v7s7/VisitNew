@@ -1,12 +1,11 @@
 import { PropertyReport } from './types';
 
 /**
- * Format date in Bahrain timezone
+ * Format date/time in Bahrain timezone
  * @param date - Date to format (defaults to current date)
- * @returns Formatted date string in Bahrain timezone
+ * @returns Formatted date string: YYYY-MM-DD HH:mm (Asia/Bahrain)
  */
 export function formatBahrainDate(date: Date = new Date()): string {
-  // Format: YYYY-MM-DD HH:mm (Asia/Bahrain)
   const options: Intl.DateTimeFormatOptions = {
     timeZone: 'Asia/Bahrain',
     year: 'numeric',
@@ -20,11 +19,11 @@ export function formatBahrainDate(date: Date = new Date()): string {
   const formatter = new Intl.DateTimeFormat('en-GB', options);
   const parts = formatter.formatToParts(date);
 
-  const year = parts.find((p) => p.type === 'year')?.value;
-  const month = parts.find((p) => p.type === 'month')?.value;
-  const day = parts.find((p) => p.type === 'day')?.value;
-  const hour = parts.find((p) => p.type === 'hour')?.value;
-  const minute = parts.find((p) => p.type === 'minute')?.value;
+  const year = parts.find((p) => p.type === 'year')?.value || '0000';
+  const month = parts.find((p) => p.type === 'month')?.value || '00';
+  const day = parts.find((p) => p.type === 'day')?.value || '00';
+  const hour = parts.find((p) => p.type === 'hour')?.value || '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value || '00';
 
   return `${year}-${month}-${day} ${hour}:${minute} (Asia/Bahrain)`;
 }
@@ -45,9 +44,9 @@ export function getBahrainDateString(date: Date = new Date()): string {
   const formatter = new Intl.DateTimeFormat('en-GB', options);
   const parts = formatter.formatToParts(date);
 
-  const year = parts.find((p) => p.type === 'year')?.value;
-  const month = parts.find((p) => p.type === 'month')?.value;
-  const day = parts.find((p) => p.type === 'day')?.value;
+  const year = parts.find((p) => p.type === 'year')?.value || '0000';
+  const month = parts.find((p) => p.type === 'month')?.value || '00';
+  const day = parts.find((p) => p.type === 'day')?.value || '00';
 
   return `${year}-${month}-${day}`;
 }
@@ -58,8 +57,7 @@ export function getBahrainDateString(date: Date = new Date()): string {
  * @returns Sanitized filename
  */
 export function sanitizeFilename(filename: string): string {
-  // Remove or replace invalid filename characters: / \ : * ? " < > |
-  return filename
+  return (filename || '')
     .replace(/[/\\:*?"<>|]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
@@ -72,33 +70,31 @@ export function sanitizeFilename(filename: string): string {
  * @returns Sanitized PDF filename
  */
 export function generatePdfFilename(report: PropertyReport): string {
-  const dateString = report.submittedAt
+  const dateString = report?.submittedAt
     ? getBahrainDateString(new Date(report.submittedAt))
     : getBahrainDateString();
 
-  const filename = `${report.propertyCode} - ${report.propertyName} - ${dateString}.pdf`;
+  const code = (report?.propertyCode || '').trim() || 'UNKNOWN';
+  const name = (report?.propertyName || '').trim() || 'Property';
+
+  const filename = `${code} - ${name} - ${dateString}.pdf`;
   return sanitizeFilename(filename);
 }
 
 /**
  * Print report (user can save as PDF from browser's print dialog)
  * @param report - Property report to print
- * @returns Promise that resolves when print dialog is opened
  */
 export async function printReport(report: PropertyReport): Promise<void> {
-  console.log('🖨️ Opening print dialog...');
-
-  // Set document title for PDF filename suggestion
   const filename = generatePdfFilename(report);
   const originalTitle = document.title;
+
+  // Some browsers use document.title as suggested filename
   document.title = filename;
 
   try {
-    // Open browser's native print dialog
     window.print();
-    console.log('✅ Print dialog opened');
   } finally {
-    // Restore original title after a delay
     setTimeout(() => {
       document.title = originalTitle;
     }, 1000);
@@ -111,11 +107,9 @@ export async function printReport(report: PropertyReport): Promise<void> {
  * @returns Error message if validation fails, null if valid
  */
 export function validateReportForPdf(report: PropertyReport | null): string | null {
-  if (!report) {
-    return 'يرجى اختيار عقار أولاً | Please select a property first';
+  if (!report) return 'يرجى اختيار عقار أولاً | Please select a property first';
+  if (!report.propertyCode || !report.propertyName) {
+    return 'بيانات العقار غير مكتملة | Property info is incomplete';
   }
-
-  // All fields are optional - PDF will show whatever is available
-  // No validation errors - always allow PDF generation if property is selected
   return null;
 }
