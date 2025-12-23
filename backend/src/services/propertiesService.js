@@ -5,56 +5,79 @@ import { getSheetsClient } from '../config/google-hybrid.js';
  * Column A: id
  * Column B: code
  * Column C: name
- * Column D: نوع الوقف (waqfType)
- * Column E: نوع العقار (propertyType)
- * Column F: موقوف على (endowedTo)
- * Column G: مبنى (building)
- * Column H: رقم الوحدة (unitNumber)
- * Column I: طريق \ شارع (road)
- * Column J: المنطقة (area)
- * Column K: المحافظة (governorate)
- * Column L: مجمع (block)
+ * Column D: waqfType
+ * Column E: propertyType
+ * Column F: endowedTo
+ * Column G: building
+ * Column H: unitNumber
+ * Column I: road
+ * Column J: area
+ * Column K: governorate
+ * Column L: block
  * Column M: defaultLocationLink
- * Column N: postcode (الرمز البريدي)
+ * Column N: postcode
  */
+
+function s(v) {
+  return (v ?? '').toString().trim();
+}
 
 /**
  * Get all properties from Google Sheet
  */
 export async function getAllProperties() {
+  const spreadsheetId = s(process.env.GOOGLE_SHEETS_PROPERTIES_ID);
+  const sheetName = s(process.env.PROPERTIES_SHEET_NAME) || 'Properties';
+
+  if (!spreadsheetId) {
+    throw new Error('Missing GOOGLE_SHEETS_PROPERTIES_ID');
+  }
+
   try {
     const sheets = await getSheetsClient();
-    const spreadsheetId = process.env.GOOGLE_SHEETS_PROPERTIES_ID;
-    const sheetName = process.env.PROPERTIES_SHEET_NAME || 'Properties';
 
+    const range = `${sheetName}!A2:N`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A2:N`, // Skip header row
+      range,
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
 
-    const properties = rows.map((row) => ({
-      id: row[0] || '',
-      code: row[1] || '',
-      name: row[2] || '',
-      waqfType: row[3] || '', // نوع الوقف
-      propertyType: row[4] || '', // نوع العقار
-      endowedTo: row[5] || '', // موقوف على
-      building: row[6] || '', // مبنى
-      unitNumber: row[7] || '', // رقم الوحدة
-      road: row[8] || '', // طريق \ شارع
-      area: row[9] || '', // المنطقة
-      governorate: row[10] || '', // المحافظة
-      block: row[11] || '', // مجمع
-      defaultLocationLink: row[12] || '',
-      postcode: row[13] || '', // الرمز البريدي
+    console.log(
+      `[Sheets] Properties read: spreadsheetId=${spreadsheetId} sheet=${sheetName} range=${range} rows=${rows.length}`
+    );
+
+    // If your app worked locally but production shows empty, this helps you detect it immediately.
+    // Remove this block later if you prefer silent empty behavior.
+    if (rows.length === 0) {
+      throw new Error(
+        `No rows returned from Google Sheets. Check: (1) sheet shared with service account, (2) correct spreadsheetId, (3) correct tab name "${sheetName}", (4) data exists in A2:N`
+      );
+    }
+
+    return rows.map((row) => ({
+      id: s(row[0]),
+      code: s(row[1]),
+      name: s(row[2]),
+      waqfType: s(row[3]),
+      propertyType: s(row[4]),
+      endowedTo: s(row[5]),
+      building: s(row[6]),
+      unitNumber: s(row[7]),
+      road: s(row[8]),
+      area: s(row[9]),
+      governorate: s(row[10]),
+      block: s(row[11]),
+      defaultLocationLink: s(row[12]),
+      postcode: s(row[13]),
     }));
-
-    return properties;
   } catch (error) {
-    console.error('Error fetching properties from Google Sheet:', error.message);
-    throw new Error('Failed to fetch properties from database');
+    console.error(
+      'Error fetching properties from Google Sheet:',
+      error?.message || error
+    );
+    throw new Error(`Failed to fetch properties from database: ${error?.message || error}`);
   }
 }
 
@@ -62,12 +85,11 @@ export async function getAllProperties() {
  * Search properties by query (name, code, area, governorate, or postcode)
  */
 export async function searchProperties(query) {
-  if (!query || !query.trim()) {
-    return [];
-  }
+  const q = s(query);
+  if (!q) return [];
 
   const allProperties = await getAllProperties();
-  const searchTerm = query.toLowerCase().trim();
+  const searchTerm = q.toLowerCase();
 
   const results = allProperties.filter((property) => {
     const name = (property.name || '').toLowerCase();
@@ -85,22 +107,17 @@ export async function searchProperties(query) {
     );
   });
 
-  // Limit results to 20 for performance
   return results.slice(0, 20);
 }
 
-/**
- * Get a single property by ID
- */
 export async function getPropertyById(id) {
   const allProperties = await getAllProperties();
-  return allProperties.find((property) => property.id === id);
+  const target = s(id);
+  return allProperties.find((p) => p.id === target);
 }
 
-/**
- * Get a single property by code
- */
 export async function getPropertyByCode(code) {
   const allProperties = await getAllProperties();
-  return allProperties.find((property) => property.code === code);
+  const target = s(code);
+  return allProperties.find((p) => p.code === target);
 }

@@ -11,33 +11,49 @@ const __dirname = path.dirname(__filename);
  *
  * - Service Account → Google Sheets (Properties & Reports)
  * - OAuth 2.0 → Google Drive (Uploads + reading files for ZIP exports)
- *
- * Notes:
- * - drive scope must allow downloading files we created (drive.file is OK if the app created the files)
- * - we use OAuth tokens saved locally in oauth-tokens.json
  */
 
 // ============================================================================
 // SERVICE ACCOUNT (for Google Sheets)
 // ============================================================================
 
-export function getServiceAccountAuth() {
+function readServiceAccountCredentials() {
+  // 1) Preferred in production (Render): env var JSON
+  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (rawJson && rawJson.trim()) {
+    try {
+      return JSON.parse(rawJson);
+    } catch (e) {
+      throw new Error(
+        'Invalid GOOGLE_SERVICE_ACCOUNT_JSON (must be valid JSON). ' +
+          'Re-paste the full service account JSON into Render env vars.'
+      );
+    }
+  }
+
+  // 2) Local dev fallback: file path
   const keyPath =
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || path.join(__dirname, '../../google-credentials.json');
+    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ||
+    path.join(__dirname, '../../google-credentials.json');
 
   if (!fs.existsSync(keyPath)) {
     throw new Error(
-      `Google credentials file not found at: ${keyPath}\n` +
-        'Please download your service account key from Google Cloud Console\n' +
-        'and save it as google-credentials.json in the backend folder.'
+      `Google credentials not found.\n` +
+        `- Set GOOGLE_SERVICE_ACCOUNT_JSON (recommended for production)\n` +
+        `- Or provide GOOGLE_SERVICE_ACCOUNT_KEY_PATH / google-credentials.json (local)\n` +
+        `Tried file path: ${keyPath}`
     );
   }
 
-  const credentials = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+  return JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+}
+
+export function getServiceAccountAuth() {
+  const credentials = readServiceAccountCredentials();
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
 
   return auth;
@@ -45,18 +61,17 @@ export function getServiceAccountAuth() {
 
 export async function getSheetsClient() {
   const auth = getServiceAccountAuth();
-  const sheets = google.sheets({ version: 'v4', auth });
-  return sheets;
+  return google.sheets({ version: 'v4', auth });
 }
 
 // ============================================================================
 // OAUTH 2.0 (for Google Drive)
 // ============================================================================
 
-// Keep drive scope because we need folder listing + file download for ZIP exports.
-// If you want least privilege, you can attempt drive.file only, but listing existing folders and
-// downloading files not created by this app can fail. For now, keep both as you had.
-const OAUTH_SCOPES = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive'];
+const OAUTH_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive',
+];
 
 export function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -68,13 +83,11 @@ export function getOAuth2Client() {
       'Missing OAuth credentials. Please set:\n' +
         '  - GOOGLE_CLIENT_ID\n' +
         '  - GOOGLE_CLIENT_SECRET\n' +
-        '  - GOOGLE_REDIRECT_URI\n' +
-        'in your .env file'
+        '  - GOOGLE_REDIRECT_URI'
     );
   }
 
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  return oauth2Client;
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
 export function generateAuthUrl() {
@@ -94,13 +107,15 @@ export async function getTokensFromCode(code) {
 }
 
 export function saveTokens(tokens) {
-  const tokenPath = process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
+  const tokenPath =
+    process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
   fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
   console.log('✅ OAuth tokens saved successfully');
 }
 
 export function loadTokens() {
-  const tokenPath = process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
+  const tokenPath =
+    process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
   if (!fs.existsSync(tokenPath)) return null;
   return JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
 }
@@ -137,8 +152,7 @@ export function getAuthenticatedOAuthClient() {
 
 export async function getDriveClient() {
   const auth = getAuthenticatedOAuthClient();
-  const drive = google.drive({ version: 'v3', auth });
-  return drive;
+  return google.drive({ version: 'v3', auth });
 }
 
 /**
@@ -155,18 +169,18 @@ export function validateConfig() {
   ];
 
   const missing = required.filter((key) => !process.env[key]);
-
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables:\n` +
-        missing.map((key) => `  - ${key}`).join('\n') +
-        '\n\nPlease check your .env file.'
+        missing.map((key) => `  - ${key}`).join('\n')
     );
   }
 
+  const hasEnvJson = Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim());
   const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './google-credentials.json';
-  if (!fs.existsSync(keyPath)) {
-    console.warn('⚠️  Warning: google-credentials.json not found. Google Sheets access will fail.');
+
+  if (!hasEnvJson && !fs.existsSync(keyPath)) {
+    console.warn('⚠️  Warning: No service account credentials found. Sheets access will fail.');
   }
 
   const tokenPath = process.env.OAUTH_TOKEN_PATH || './oauth-tokens.json';
