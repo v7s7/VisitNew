@@ -1,5 +1,5 @@
 import { PropertyReport } from './types';
-import { sanitizeFilename, getBahrainDateString, generatePdfFilename } from './pdfUtils';
+import { sanitizeFilename, generatePdfFilename } from './pdfUtils';
 import { downloadBundleZip } from './api';
 
 async function fetchBlob(url: string): Promise<Blob | null> {
@@ -28,10 +28,8 @@ function pickBestName(obj: unknown, fallback: string): string {
   if (!obj || typeof obj !== 'object') return fallback;
   const o = obj as Record<string, any>;
 
-  // Prefer real File name if available
   if (o.file instanceof File && o.file.name) return o.file.name;
 
-  // Some models may store a plain name/originalName/filename
   if (typeof o.name === 'string' && o.name.trim()) return o.name.trim();
   if (typeof o.originalName === 'string' && o.originalName.trim()) return o.originalName.trim();
   if (typeof o.filename === 'string' && o.filename.trim()) return o.filename.trim();
@@ -39,66 +37,86 @@ function pickBestName(obj: unknown, fallback: string): string {
   return fallback;
 }
 
-/**
- * Generate a PDF blob from the hidden PDF DOM (#pdf-content)
- * Uses dynamic imports to avoid bloating initial bundle.
- */
-export async function generatePdfBlobFromDom(pdfContentId: string = 'pdf-content'): Promise<Blob> {
-  const el = document.getElementById(pdfContentId);
-  if (!el) throw new Error(`PDF content not found (missing #${pdfContentId}).`);
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
 
-  const prevClass = el.className;
-  el.className = prevClass.replace('pdf-content-hidden', '').trim();
+async function inlineImages(root: HTMLElement): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = img.getAttribute('src') || '';
+      if (!src || src.startsWith('data:')) return;
 
-  try {
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ]);
+      try {
+        const res = await fetch(src);
+        if (!res.ok) return;
 
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      windowWidth: el.scrollWidth,
-      windowHeight: el.scrollHeight,
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgProps = pdf.getImageProperties(imgData);
-    const imgWidth = pageWidth;
-    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-    let y = 0;
-    let remaining = imgHeight;
-
-    while (remaining > 0) {
-      pdf.addImage(imgData, 'PNG', 0, y, imgWidth, imgHeight);
-      remaining -= pageHeight;
-
-      if (remaining > 0) {
-        pdf.addPage();
-        y -= pageHeight;
+        const blob = await res.blob();
+        const dataUrl = await blobToDataUrl(blob);
+        img.setAttribute('src', dataUrl);
+      } catch {
+        // ignore
       }
-    }
+    })
+  );
+}
 
-    return pdf.output('blob');
-  } finally {
-    el.className = prevClass;
+function collectCssText(): string {
+  let css = '';
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      for (const rule of Array.from(sheet.cssRules)) css += rule.cssText + '\n';
+    } catch {
+      // cross-origin stylesheet => ignore
+    }
   }
+  return css;
 }
 
 /**
- * Download ZIP via backend (/api/bundle) and include the same client-rendered PDF used for Print.
+ * Build HTML from the SAME DOM used for printing (#pdf-content),
+ * including inline <img> as data URLs, and injected CSS.
+ * This is what backend uses to generate a REAL PDF via Chromium print.
+ */
+export async function buildPdfHtmlFromDom(pdfContentId: string = 'pdf-content'): Promise<string> {
+  const el = document.getElementById(pdfContentId);
+  if (!el) throw new Error(`PDF content not found (missing #${pdfContentId}).`);
+
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.classList.remove('pdf-content-hidden');
+  clone.style.display = 'block';
+
+  await inlineImages(clone);
+
+  const cssText = collectCssText();
+  const baseHref = window.location.origin + '/';
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <base href="${baseHref}">
+  <style>${cssText}</style>
+  <style>
+    @page { size: A4; margin: 10mm; }
+    html, body { background: #fff; margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  ${clone.outerHTML}
+</body>
+</html>`;
+}
+
+/**
+ * Download ZIP via backend (/api/bundle) and include the SAME “Print” PDF (Chromium print),
+ * not an image-based PDF.
  */
 export async function downloadReportZip(report: PropertyReport): Promise<void> {
   const filesPayload: Array<{ field: string; file: File }> = [];
@@ -149,11 +167,9 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
     const hasRealFile = item.file instanceof File && item.file.size > 0;
     if (hasRealFile) continue;
 
-    let url: string | undefined;
-
     if (item.field === 'mainPhotos') {
       const idx = filesPayload.slice(0, i + 1).filter((x) => x.field === 'mainPhotos').length - 1;
-      url = report.mainPhotos?.[idx]?.uploadedUrl;
+      const url = report.mainPhotos?.[idx]?.uploadedUrl;
 
       const base = pickBestName(report.mainPhotos?.[idx], `Main Photo ${idx + 1}`);
       const blob = url ? await fetchBlob(url) : null;
@@ -167,7 +183,7 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
 
     if (item.field === 'complaintFiles') {
       const idx = filesPayload.slice(0, i + 1).filter((x) => x.field === 'complaintFiles').length - 1;
-      url = report.complaintFiles?.[idx]?.uploadedUrl;
+      const url = report.complaintFiles?.[idx]?.uploadedUrl;
 
       const base = pickBestName(report.complaintFiles?.[idx], `Complaint File ${idx + 1}`);
       const blob = url ? await fetchBlob(url) : null;
@@ -180,12 +196,12 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
     }
 
     if (item.field.startsWith('findingPhotos__')) {
-      const idx = Number(item.field.split('__')[1]);
+      const findingIdx = Number(item.field.split('__')[1]);
       const photoIdx = filesPayload.filter((x) => x.field === item.field).indexOf(item);
 
-      url = report.findings?.[idx]?.photos?.[photoIdx]?.uploadedUrl;
+      const url = report.findings?.[findingIdx]?.photos?.[photoIdx]?.uploadedUrl;
 
-      const base = pickBestName(report.findings?.[idx]?.photos?.[photoIdx], `Photo ${photoIdx + 1}`);
+      const base = pickBestName(report.findings?.[findingIdx]?.photos?.[photoIdx], `Photo ${photoIdx + 1}`);
       const blob = url ? await fetchBlob(url) : null;
       if (blob) {
         const ext = getFileExtensionFromNameOrMime(base, blob.type);
@@ -196,20 +212,11 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
     }
   }
 
-  // Attach client PDF (same as print DOM) into the backend ZIP
-  let reportPdf: Blob | undefined;
-  try {
-    reportPdf = await generatePdfBlobFromDom('pdf-content');
-  } catch {
-    reportPdf = undefined;
-  }
+  // Build PRINT-IDENTICAL HTML and let backend generate a real PDF via Chromium print
+  const pdfHtml = await buildPdfHtmlFromDom('pdf-content');
+  const pdfFileName = generatePdfFilename(report);
 
-  const reportPdfFileName = generatePdfFilename({
-    ...report,
-    submittedAt: report.submittedAt || `${getBahrainDateString()}T00:00:00`,
-  } as any);
-
-  await downloadBundleZip(report, filesPayload, { reportPdf, reportPdfFileName });
+  await downloadBundleZip(report, filesPayload, { pdfHtml, pdfFileName });
 }
 
 export function validateReportForZip(report: PropertyReport | null): string | null {

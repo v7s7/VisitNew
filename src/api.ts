@@ -175,17 +175,13 @@ export async function getReportExports(reportId: string): Promise<any> {
 export async function downloadBundleZip(
   report: PropertyReport,
   files: Array<{ field: string; file: File }>,
-  opts?: { reportPdf?: Blob; reportPdfFileName?: string }
+  opts?: { pdfHtml?: string; pdfFileName?: string }
 ): Promise<void> {
   const formData = new FormData();
   formData.append('report', JSON.stringify(report));
 
-  // IMPORTANT: if you generate the PDF on the client (same as Print),
-  // attach it here so backend puts this exact PDF inside the ZIP.
-  if (opts?.reportPdf) {
-    const pdfName = (opts.reportPdfFileName || 'report.pdf').trim() || 'report.pdf';
-    formData.append('reportPdf', opts.reportPdf, pdfName);
-  }
+  if (opts?.pdfHtml) formData.append('pdfHtml', opts.pdfHtml);
+  if (opts?.pdfFileName) formData.append('pdfFileName', opts.pdfFileName);
 
   for (const item of files) {
     formData.append(item.field, item.file, item.file.name);
@@ -204,13 +200,11 @@ export async function downloadBundleZip(
 
   const blob = await response.blob();
 
-  // Best-effort filename from header
   const cd = response.headers.get('content-disposition') || '';
   const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
   const filenameRaw = decodeURIComponent((match?.[1] || match?.[2] || 'bundle.zip').trim());
   const filename = filenameRaw && filenameRaw.toLowerCase().endsWith('.zip') ? filenameRaw : 'bundle.zip';
 
-  // Download without changing page (prevents white screen)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.style.display = 'none';

@@ -22,19 +22,22 @@ export async function generateBundleHandler(req, res) {
     }
 
     const files = req.files || [];
+    const pdfHtml = req.body?.pdfHtml || '';
+    const pdfFileName = req.body?.pdfFileName || '';
 
     const { zipBuffer, zipFileName } = await bundleService.generateZipBundle({
       report,
       files,
-      fields: req.body || {},
+      pdfHtml,
+      pdfFileName,
     });
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
-    return res.status(200).send(zipBuffer);
+    res.status(200).send(zipBuffer);
   } catch (error) {
     console.error('Bundle generation error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Failed to generate bundle',
       error: error.message,

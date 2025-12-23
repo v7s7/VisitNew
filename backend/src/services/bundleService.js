@@ -24,72 +24,99 @@ function getBahrainDateString(date = new Date()) {
 }
 
 function buildZipName(report) {
-  const dateStr = report?.submittedAt
-    ? getBahrainDateString(new Date(report.submittedAt))
-    : getBahrainDateString();
+  const dateStr = report?.submittedAt ? getBahrainDateString(new Date(report.submittedAt)) : getBahrainDateString();
   const code = sanitizeFileName(report?.propertyCode || 'Report');
   const name = sanitizeFileName(report?.propertyName || 'Property');
   return `${code} - ${name} - ${dateStr}.zip`;
 }
 
-function pickUploadedPdf(files) {
-  const f = (files || []).find(
-    (x) => x?.fieldname === 'reportPdf' && x?.mimetype === 'application/pdf' && x?.buffer?.length
-  );
-  return f?.buffer || null;
+function defaultPdfName(report) {
+  const dateStr = report?.submittedAt ? getBahrainDateString(new Date(report.submittedAt)) : getBahrainDateString();
+  const code = sanitizeFileName(report?.propertyCode || 'Report');
+  const name = sanitizeFileName(report?.propertyName || 'Property');
+  return `${code} - ${name} - ${dateStr}.pdf`;
+}
+
+async function getChromium() {
+  try {
+    const mod = await import('playwright');
+    if (mod?.chromium) return mod.chromium;
+  } catch {}
+  try {
+    const mod = await import('playwright-chromium');
+    if (mod?.chromium) return mod.chromium;
+  } catch {}
+  throw new Error('Playwright chromium not available. Install playwright or playwright-chromium on backend.');
+}
+
+async function generatePdfBufferFromHtml(html) {
+  const chromium = await getChromium();
+  const browser = await chromium.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  try {
+    const page = await browser.newPage();
+    // Print CSS mode (matches window.print behavior)
+    try {
+      await page.emulateMedia({ media: 'print' });
+    } catch {}
+    try {
+      await page.emulateMediaType('print');
+    } catch {}
+
+    await page.setContent(html, { waitUntil: 'networkidle' });
+
+    // preferCSSPageSize makes @page rules work like print
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+    });
+
+    return pdfBuffer;
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }
 
 function parseFindingIndex(field) {
-  // Supports:
-  // - findingPhotos__0 (zero-based)
-  // - findingPhotos_1 (one-based legacy)
+  // Support BOTH:
+  // - findingPhotos__0  (0-based)
+  // - findingPhotos_1   (1-based)
   if (field.startsWith('findingPhotos__')) {
     const idxRaw = field.split('__')[1];
     const idx = Number(idxRaw);
     return Number.isFinite(idx) ? idx : null;
   }
-
   if (field.startsWith('findingPhotos_')) {
     const idxRaw = field.split('_')[1];
-    const oneBased = Number(idxRaw);
-    if (!Number.isFinite(oneBased)) return null;
-    return Math.max(0, oneBased - 1);
+    const n = Number(idxRaw);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, n - 1);
   }
-
   return null;
 }
 
-/**
- * Expected frontend file fields:
- * - reportPdf (single)  <-- client-generated PDF (same as Print -> Save as PDF)
- * - mainPhotos (multiple)
- * - findingPhotos__<index> (multiple) OR findingPhotos_<index+1> (legacy)
- * - complaintFiles (multiple)
- */
-export async function generateZipBundle({ report, files }) {
+export async function generateZipBundle({ report, files, pdfHtml, pdfFileName }) {
   const zip = new JSZip();
 
-  // 1) Add PDF to ZIP:
-  // Prefer client PDF (same as Print), fallback to Playwright
-  let pdfBuffer = pickUploadedPdf(files);
-  if (!pdfBuffer) {
+  // 1) PDF (REAL PDF)
+  let pdfBuffer;
+  if (pdfHtml && String(pdfHtml).trim()) {
+    pdfBuffer = await generatePdfBufferFromHtml(String(pdfHtml));
+  } else {
+    // fallback to your existing backend generator
     pdfBuffer = await generatePdfBuffer(report);
   }
 
-  const dateStr = report?.submittedAt
-    ? getBahrainDateString(new Date(report.submittedAt))
-    : getBahrainDateString();
-
-  const pdfName = sanitizeFileName(
-    `${report?.propertyCode || 'Report'} - ${report?.propertyName || 'Property'} - ${dateStr}.pdf`
-  );
-
+  const pdfName = sanitizeFileName(pdfFileName || defaultPdfName(report));
   zip.folder('PDF')?.file(pdfName, pdfBuffer);
 
-  // 2) Add metadata
-  zip.file('Report.json', JSON.stringify(report, null, 2));
+  // NOTE: removed Report.json (you said you don’t want the JSON)
 
-  // 3) Add files into structured folders
+  // 2) Add files into folders
   const mainFolder = zip.folder('Main Photos');
   const findingsRoot = zip.folder('Findings');
   const complaintFolder = zip.folder('Complaint Files');
@@ -101,11 +128,6 @@ export async function generateZipBundle({ report, files }) {
     const original = sanitizeFileName(f.originalname || 'file');
     const buf = f.buffer;
 
-    if (!buf || !buf.length) continue;
-
-    // Skip the uploaded PDF attachment itself (already placed in PDF folder)
-    if (field === 'reportPdf') continue;
-
     if (field === 'mainPhotos') {
       mainFolder?.file(original, buf);
       continue;
@@ -116,21 +138,15 @@ export async function generateZipBundle({ report, files }) {
       continue;
     }
 
-    const idx = parseFindingIndex(field);
-    if (idx !== null) {
-      const findingNumber = idx + 1;
-
-      const findingText = safeStr(findings?.[idx]?.text || '')
-        .substring(0, 50)
-        .trim();
-
+    const findingIdx = parseFindingIndex(field);
+    if (findingIdx !== null) {
+      const findingNumber = findingIdx + 1;
+      const findingText = safeStr(findings?.[findingIdx]?.text || '').substring(0, 50).trim();
       const folderName = sanitizeFileName(`Finding ${findingNumber} - ${findingText || 'No Description'}`);
-
       findingsRoot?.folder(folderName)?.file(original, buf);
       continue;
     }
 
-    // Unknown field: put it in Misc
     zip.folder('Misc')?.file(original, buf);
   }
 
