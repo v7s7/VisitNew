@@ -1,15 +1,11 @@
-/* PDF Report Styles */
+/* =========================
+   PDF Report Styles (YOUR DESIGN)
+   ========================= */
 .pdf-report {
-  /* Keep A4 sizing for on-screen preview */
-  width: 210mm;
-  min-height: 297mm;
-
-  /* IMPORTANT:
-     Use ONE source of margin/padding.
-     We'll keep padding here for screen, and override in print. */
+  width: 210mm; /* A4 width */
+  min-height: 297mm; /* A4 height */
   padding: 10mm 15mm;
   margin: 0 auto;
-
   background: #ffffff;
   color: #1a202c;
   font-family: 'Arial', 'Helvetica', 'Tahoma', sans-serif;
@@ -17,10 +13,6 @@
   line-height: 1.6;
   direction: rtl;
   box-sizing: border-box;
-
-  /* Helps print engines keep colors */
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
 }
 
 /* Header */
@@ -59,10 +51,7 @@
 /* Sections */
 .pdf-section {
   margin-bottom: 20px;
-
-  /* Better compatibility */
   page-break-inside: avoid;
-  break-inside: avoid;
 }
 
 .pdf-section-title {
@@ -98,8 +87,7 @@
 .pdf-value {
   color: #1a202c;
   font-size: 10.5pt;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  word-wrap: break-word;
 }
 
 /* Links */
@@ -119,10 +107,7 @@
 
 .pdf-photo-item {
   text-align: center;
-
   page-break-inside: avoid;
-  break-inside: avoid;
-
   background: #f8f9fa;
   padding: 8px;
   border-radius: 6px;
@@ -152,9 +137,6 @@
   border-radius: 4px;
   display: block;
   background: #ffffff;
-
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
 }
 
 .pdf-photo-label {
@@ -205,9 +187,7 @@
   background: #f7fafc;
   border-right: 4px solid #4299e1;
   border-radius: 4px;
-
   page-break-inside: avoid;
-  break-inside: avoid;
 }
 
 .pdf-finding-header {
@@ -230,46 +210,9 @@
   line-height: 1.4;
 }
 
-/* Print-specific styles */
-@media print {
-  /* IMPORTANT:
-     This margin controls the "print to PDF" output AND Playwright (preferCSSPageSize).
-     Keep it the single source of truth for margins. */
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  }
-
-  html,
-  body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-  }
-
-  /* Remove the screen padding, because @page margin already gives whitespace */
-  .pdf-report {
-    width: auto !important;
-    min-height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-  }
-
-  /* Ensure proper page breaks */
-  .pdf-section,
-  .pdf-photo-item,
-  .pdf-finding {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  /* Hide any web-specific elements */
-  .no-print {
-    display: none !important;
-  }
-}
-/* Keep the PDF DOM in the page, but completely off-screen (no layout impact) */
+/* =========================
+   FIX #1: Hide the PDF DOM on screen (keeps mobile UI perfect)
+   ========================= */
 .pdf-content-hidden {
   position: fixed !important;
   left: -100000px !important;
@@ -280,20 +223,25 @@
   pointer-events: none !important;
 }
 
-/* PRINT: show ONLY the report */
+/* =========================
+   Print-specific styles (YOUR DESIGN + FIX #2: print only the report)
+   ========================= */
 @media print {
-  /* hide everything */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
+  /* FIX #2: Print ONLY #pdf-content (hide the rest of the app) */
   body * {
     visibility: hidden !important;
   }
 
-  /* show only pdf-content */
   #pdf-content,
   #pdf-content * {
     visibility: visible !important;
   }
 
-  /* place it at the top-left for printing */
   #pdf-content {
     position: absolute !important;
     left: 0 !important;
@@ -301,10 +249,41 @@
     width: 100% !important;
   }
 
-  /* remove the off-screen hiding during print */
+  /* Cancel the off-screen hiding during print */
   .pdf-content-hidden {
     position: static !important;
     left: auto !important;
     visibility: visible !important;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .pdf-report {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .pdf-section {
+    page-break-inside: avoid;
+  }
+
+  .pdf-photo-item,
+  .pdf-finding {
+    page-break-inside: avoid;
+  }
+
+  .pdf-photo-thumbnail {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
   }
 }
