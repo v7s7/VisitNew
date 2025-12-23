@@ -269,3 +269,42 @@
     display: none !important;
   }
 }
+/* Keep the PDF DOM in the page, but completely off-screen (no layout impact) */
+.pdf-content-hidden {
+  position: fixed !important;
+  left: -100000px !important;
+  top: 0 !important;
+  width: 210mm !important;
+  background: #fff !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* PRINT: show ONLY the report */
+@media print {
+  /* hide everything */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* show only pdf-content */
+  #pdf-content,
+  #pdf-content * {
+    visibility: visible !important;
+  }
+
+  /* place it at the top-left for printing */
+  #pdf-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+  }
+
+  /* remove the off-screen hiding during print */
+  .pdf-content-hidden {
+    position: static !important;
+    left: auto !important;
+    visibility: visible !important;
+  }
+}
