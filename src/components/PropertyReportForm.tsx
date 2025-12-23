@@ -1,8 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
+import {
+  Property,
+  PropertyReport,
+  Finding,
+  Action,
+  UploadedPhoto,
+  ComplaintFile,
+} from '../types';
 import { isValidUrl } from '../utils';
-import { validateReportForPdf, formatBahrainDate, generatePdfFilename } from '../pdfUtils';
-import { downloadBundleZip } from '../api';
+import { validateReportForPdf, formatBahrainDate } from '../pdfUtils';
+import { downloadReportZip } from '../zipUtils';
 
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
@@ -38,77 +45,6 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
     hasAnyActionText ||
     hasAnyFiles
   );
-}
-
-async function blobToDataUrl(blob: Blob): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
-}
-
-async function inlineImages(root: HTMLElement): Promise<void> {
-  const imgs = Array.from(root.querySelectorAll('img'));
-  await Promise.all(
-    imgs.map(async (img) => {
-      const src = img.getAttribute('src') || '';
-      if (!src || src.startsWith('data:')) return;
-
-      try {
-        const res = await fetch(src);
-        if (!res.ok) return;
-        const blob = await res.blob();
-        const dataUrl = await blobToDataUrl(blob);
-        img.setAttribute('src', dataUrl);
-      } catch {
-        // ignore
-      }
-    })
-  );
-}
-
-function collectCssText(): string {
-  let css = '';
-  for (const sheet of Array.from(document.styleSheets)) {
-    try {
-      for (const rule of Array.from(sheet.cssRules)) css += rule.cssText + '\n';
-    } catch {
-      // cross-origin stylesheet => ignore
-    }
-  }
-  return css;
-}
-
-async function buildPdfHtmlFromDom(pdfContentId: string = 'pdf-content'): Promise<string> {
-  const el = document.getElementById(pdfContentId);
-  if (!el) throw new Error(`PDF content not found (missing #${pdfContentId}).`);
-
-  const clone = el.cloneNode(true) as HTMLElement;
-  clone.classList.remove('pdf-content-hidden');
-  clone.style.display = 'block';
-
-  await inlineImages(clone);
-
-  const cssText = collectCssText();
-  const baseHref = window.location.origin + '/';
-
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <base href="${baseHref}">
-  <style>${cssText}</style>
-  <style>
-    @page { size: A4; margin: 10mm; }
-    html, body { background: #fff; margin: 0; padding: 0; }
-  </style>
-</head>
-<body>
-  ${clone.outerHTML}
-</body>
-</html>`;
 }
 
 export default function PropertyReportForm() {
@@ -262,7 +198,9 @@ export default function PropertyReportForm() {
       }
 
       try {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
 
         const validationError = validateReportForPdf(currentReport);
         if (validationError) {
@@ -274,7 +212,10 @@ export default function PropertyReportForm() {
         window.print();
       } catch (error: any) {
         console.error('Print error:', error);
-        setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
+        setPdfError(
+          error.message ||
+            'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
+        );
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         setPrintQueued(false);
@@ -327,7 +268,9 @@ export default function PropertyReportForm() {
     setZipError(null);
 
     try {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
 
       const pdfValidationError = validateReportForPdf(currentReport);
       if (pdfValidationError) {
@@ -336,31 +279,7 @@ export default function PropertyReportForm() {
         return;
       }
 
-      const filesPayload: Array<{ field: string; file: File }> = [];
-
-      for (const p of mainPhotos) {
-        if (p?.file) filesPayload.push({ field: 'mainPhotos', file: p.file });
-      }
-
-      for (const f of complaintFiles) {
-        if (f?.file) filesPayload.push({ field: 'complaintFiles', file: f.file });
-      }
-
-      findings.forEach((finding, idx) => {
-        const field = `findingPhotos__${idx}`;
-        (finding.photos || []).forEach((p) => {
-          if (p?.file) filesPayload.push({ field, file: p.file });
-        });
-      });
-
-      // Build HTML from the same Print DOM and send it to backend to generate a REAL PDF (Chromium print)
-      const pdfHtml = await buildPdfHtmlFromDom('pdf-content');
-      const pdfFileName = generatePdfFilename(currentReport);
-
-      await downloadBundleZip(currentReport, filesPayload, {
-        pdfHtml,
-        pdfFileName,
-      });
+      await downloadReportZip(currentReport);
     } catch (error: any) {
       console.error('ZIP download error:', error);
       setZipError(error.message || 'فشل تحميل الملف. حاول مرة أخرى. | Failed to download ZIP. Try again.');

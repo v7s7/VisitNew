@@ -51,13 +51,15 @@ async function getChromium() {
 
 async function generatePdfBufferFromHtml(html) {
   const chromium = await getChromium();
+
   const browser = await chromium.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   try {
     const page = await browser.newPage();
-    // Print CSS mode (matches window.print behavior)
+
+    // Print mode (match window.print CSS)
     try {
       await page.emulateMedia({ media: 'print' });
     } catch {}
@@ -65,14 +67,23 @@ async function generatePdfBufferFromHtml(html) {
       await page.emulateMediaType('print');
     } catch {}
 
-    await page.setContent(html, { waitUntil: 'networkidle' });
+    // Set content and wait for assets/fonts
+    await page.setContent(String(html), { waitUntil: 'networkidle' });
+    try {
+      await page.evaluate(async () => {
+        // wait for fonts
+        // @ts-ignore
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      });
+    } catch {}
 
-    // preferCSSPageSize makes @page rules work like print
+    // IMPORTANT:
+    // - preferCSSPageSize: uses @page size/margins like printing
+    // - no explicit margin here: let your print CSS control it
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
     });
 
     return pdfBuffer;
@@ -107,14 +118,12 @@ export async function generateZipBundle({ report, files, pdfHtml, pdfFileName })
   if (pdfHtml && String(pdfHtml).trim()) {
     pdfBuffer = await generatePdfBufferFromHtml(String(pdfHtml));
   } else {
-    // fallback to your existing backend generator
+    // fallback (keep, but on Render this likely uses Playwright too)
     pdfBuffer = await generatePdfBuffer(report);
   }
 
   const pdfName = sanitizeFileName(pdfFileName || defaultPdfName(report));
   zip.folder('PDF')?.file(pdfName, pdfBuffer);
-
-  // NOTE: removed Report.json (you said you don’t want the JSON)
 
   // 2) Add files into folders
   const mainFolder = zip.folder('Main Photos');

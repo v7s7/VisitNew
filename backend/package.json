@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test-setup": "node test-setup.js"
+    "test-setup": "node test-setup.js",
+    "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "archiver": "^7.0.1",

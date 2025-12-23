@@ -1,6 +1,6 @@
 import * as bundleService from '../services/bundleService.js';
 
-export async function generateBundleHandler(req, res) {
+export async function generateBundleHandler(req, res, next) {
   try {
     const reportJson = req.body?.report;
 
@@ -14,7 +14,7 @@ export async function generateBundleHandler(req, res) {
     let report;
     try {
       report = JSON.parse(reportJson);
-    } catch {
+    } catch (e) {
       return res.status(400).json({
         success: false,
         message: 'Invalid report JSON',
@@ -22,6 +22,7 @@ export async function generateBundleHandler(req, res) {
     }
 
     const files = req.files || [];
+
     const pdfHtml = req.body?.pdfHtml || '';
     const pdfFileName = req.body?.pdfFileName || '';
 

@@ -1,253 +1,271 @@
-.property-report-form {
-  max-width: 640px;
+/* PDF Report Styles */
+.pdf-report {
+  /* Keep A4 sizing for on-screen preview */
+  width: 210mm;
+  min-height: 297mm;
+
+  /* IMPORTANT:
+     Use ONE source of margin/padding.
+     We'll keep padding here for screen, and override in print. */
+  padding: 10mm 15mm;
   margin: 0 auto;
-  padding: var(--spacing-md);
-  padding-bottom: var(--spacing-2xl);
+
+  background: #ffffff;
+  color: #1a202c;
+  font-family: 'Arial', 'Helvetica', 'Tahoma', sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  direction: rtl;
+  box-sizing: border-box;
+
+  /* Helps print engines keep colors */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-.form-header {
+/* Header */
+.pdf-header {
   text-align: center;
-  margin-bottom: var(--spacing-2xl);
-  padding: var(--spacing-xl) var(--spacing-md);
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  color: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 3px solid #2d3748;
 }
 
-.form-title {
-  font-size: var(--text-3xl);
-  font-weight: 700;
-  margin-bottom: var(--spacing-sm);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.pdf-title {
+  font-size: 22pt;
+  font-weight: bold;
+  color: #2d3748;
+  margin: 0 0 6px 0;
 }
 
-.form-subtitle {
-  font-size: var(--text-base);
-  opacity: 0.95;
-  font-weight: 400;
-  margin: 0;
+.pdf-subtitle {
+  font-size: 15pt;
+  font-weight: normal;
+  color: #4a5568;
+  margin: 0 0 12px 0;
 }
 
-/* Alerts */
-.alert {
-  padding: var(--spacing-lg);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--spacing-xl);
-  font-weight: 500;
-  text-align: center;
-  animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.alert-error {
-  background-color: #fee;
-  color: var(--danger);
-  border: 2px solid var(--danger);
-}
-
-.alert-success {
-  background-color: #efe;
-  color: var(--success);
-  border: 2px solid var(--success);
-}
-
-/* Form disabled state */
-.form-disabled-message {
-  padding: var(--spacing-2xl);
-  text-align: center;
-  background: var(--gray-50);
-  border: 2px dashed var(--gray-300);
-  border-radius: var(--radius-lg);
-  color: var(--gray-600);
-  font-size: var(--text-lg);
-  line-height: 1.8;
-  margin: var(--spacing-2xl) 0;
-}
-
-/* Section styling */
-.section {
-  background: white;
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  margin-bottom: var(--spacing-xl);
-}
-
-.section-title {
-  font-size: var(--text-lg);
+.pdf-metadata {
+  font-size: 11pt;
+  color: #4a5568;
+  margin-top: 8px;
   font-weight: 600;
-  color: var(--gray-800);
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-md);
-  border-bottom: 2px solid var(--gray-200);
 }
 
-/* Submit section */
-.submit-section {
-  position: static; /* or just remove position */
-  background: white;
-  padding: var(--spacing-lg);
-  border-top: 2px solid var(--gray-200);
-  box-shadow: none; /* optional */
-  margin-top: var(--spacing-2xl);
+.pdf-metadata div {
+  margin: 3px 0;
+}
+
+/* Sections */
+.pdf-section {
+  margin-bottom: 20px;
+
+  /* Better compatibility */
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.pdf-section-title {
+  font-size: 13pt;
+  font-weight: bold;
+  color: #2d3748;
+  margin: 0 0 10px 0;
+  padding-bottom: 5px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Fields */
+.pdf-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pdf-field {
+  margin-bottom: 6px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
 }
 
+.pdf-label {
+  font-weight: bold;
+  color: #4a5568;
+  font-size: 10pt;
+  margin-bottom: 2px;
+}
 
-.pdf-button,
-.zip-button {
-  width: 100%;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  padding: var(--spacing-lg);
-  min-height: 56px;
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
+.pdf-value {
+  color: #1a202c;
+  font-size: 10.5pt;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Links */
+.pdf-link {
+  color: #3182ce;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* Photo Grid - 2 columns, larger squares */
+.pdf-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pdf-photo-item {
+  text-align: center;
+
+  page-break-inside: avoid;
+  break-inside: avoid;
+
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.pdf-photo-link,
+.pdf-photo-wrapper {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pdf-photo-link {
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-md);
+}
+
+.pdf-photo-link:hover {
+  opacity: 0.9;
+}
+
+.pdf-photo-thumbnail {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 2px solid #cbd5e0;
+  border-radius: 4px;
+  display: block;
+  background: #ffffff;
+
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.pdf-photo-label {
+  font-size: 9pt;
+  color: #4a5568;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+/* File List */
+.pdf-file-list {
+  margin-top: 8px;
+}
+
+.pdf-file-item {
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
+  gap: 5px;
+  flex-wrap: wrap;
 }
 
-.pdf-button {
-  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
-}
-
-.pdf-button:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-}
-
-.pdf-button:disabled {
-  background: var(--gray-300);
-  color: var(--gray-500);
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-.zip-button {
-  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-}
-
-.zip-button:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-}
-
-.zip-button:disabled {
-  background: var(--gray-300);
-  color: var(--gray-500);
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-.submit-button {
-  width: 100%;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  padding: var(--spacing-lg);
-  min-height: 56px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  box-shadow: var(--shadow-md);
-  gap: var(--spacing-md);
-}
-
-.submit-button:hover:not(:disabled) {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-
-.submit-button:disabled {
-  background: var(--gray-300);
-  box-shadow: none;
-  transform: none;
-}
-
-/* Responsive improvements */
-@media (min-width: 768px) {
-  .property-report-form {
-    padding: var(--spacing-xl);
-  }
-
-  .form-header {
-    padding: var(--spacing-2xl);
-  }
-
-  .section {
-    padding: var(--spacing-2xl);
-  }
-
-  .submit-section {
-    border-radius: var(--radius-lg);
-    margin: var(--spacing-2xl) 0;
-    flex-direction: row;
-  }
-
-  .pdf-button,
-  .zip-button,
-  .submit-button {
-    flex: 1;
-  }
-}
-
-/* Required field indicator */
-label:has(+ input[required]),
-label:has(+ textarea[required]) {
-  position: relative;
-}
-
-label:has(+ input[required])::after,
-label:has(+ textarea[required])::after {
-  content: " *";
-  color: var(--danger);
+.pdf-file-number {
   font-weight: bold;
+  color: #4a5568;
 }
 
-/* Hide PDF content on screen */
-.pdf-content-hidden {
-  display: none;
+.pdf-file-link {
+  color: #3182ce;
+  text-decoration: underline;
+  flex: 1;
 }
 
-/* Print styles - hide form, show PDF view */
+.pdf-file-name {
+  flex: 1;
+  color: #1a202c;
+}
+
+.pdf-file-info {
+  font-size: 9pt;
+  color: #718096;
+}
+
+/* Findings */
+.pdf-finding {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f7fafc;
+  border-right: 4px solid #4299e1;
+  border-radius: 4px;
+
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.pdf-finding-header {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.pdf-finding-photos {
+  margin-top: 8px;
+}
+
+/* Action List */
+.pdf-action-list {
+  margin: 8px 0;
+  padding-right: 20px;
+}
+
+.pdf-action-item {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* Print-specific styles */
 @media print {
-  /* Hide everything except PDF content */
-  .property-report-form > *:not(.pdf-content-hidden) {
-    display: none !important;
+  /* IMPORTANT:
+     This margin controls the "print to PDF" output AND Playwright (preferCSSPageSize).
+     Keep it the single source of truth for margins. */
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
   }
 
-  /* Show PDF content */
-  .pdf-content-hidden {
-    display: block !important;
-    position: static !important;
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
   }
-}
-@media (max-width: 767px) {
-  .pdf-button,
-  .zip-button,
-  .submit-button {
-    padding: var(--spacing-md);
-    min-height: 44px;
-    font-size: var(--text-base);
+
+  /* Remove the screen padding, because @page margin already gives whitespace */
+  .pdf-report {
+    width: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .pdf-section,
+  .pdf-photo-item,
+  .pdf-finding {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Hide any web-specific elements */
+  .no-print {
+    display: none !important;
   }
 }

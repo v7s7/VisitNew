@@ -27,13 +27,10 @@ function blobToFile(blob: Blob, fileName: string): File {
 function pickBestName(obj: unknown, fallback: string): string {
   if (!obj || typeof obj !== 'object') return fallback;
   const o = obj as Record<string, any>;
-
   if (o.file instanceof File && o.file.name) return o.file.name;
-
   if (typeof o.name === 'string' && o.name.trim()) return o.name.trim();
   if (typeof o.originalName === 'string' && o.originalName.trim()) return o.originalName.trim();
   if (typeof o.filename === 'string' && o.filename.trim()) return o.filename.trim();
-
   return fallback;
 }
 
@@ -52,11 +49,9 @@ async function inlineImages(root: HTMLElement): Promise<void> {
     imgs.map(async (img) => {
       const src = img.getAttribute('src') || '';
       if (!src || src.startsWith('data:')) return;
-
       try {
         const res = await fetch(src);
         if (!res.ok) return;
-
         const blob = await res.blob();
         const dataUrl = await blobToDataUrl(blob);
         img.setAttribute('src', dataUrl);
@@ -81,8 +76,8 @@ function collectCssText(): string {
 
 /**
  * Build HTML from the SAME DOM used for printing (#pdf-content),
- * including inline <img> as data URLs, and injected CSS.
- * This is what backend uses to generate a REAL PDF via Chromium print.
+ * with inlined images + injected CSS.
+ * Backend will print this HTML to a REAL PDF (not image PDF).
  */
 export async function buildPdfHtmlFromDom(pdfContentId: string = 'pdf-content'): Promise<string> {
   const el = document.getElementById(pdfContentId);
@@ -114,10 +109,6 @@ export async function buildPdfHtmlFromDom(pdfContentId: string = 'pdf-content'):
 </html>`;
 }
 
-/**
- * Download ZIP via backend (/api/bundle) and include the SAME “Print” PDF (Chromium print),
- * not an image-based PDF.
- */
 export async function downloadReportZip(report: PropertyReport): Promise<void> {
   const filesPayload: Array<{ field: string; file: File }> = [];
 
@@ -126,10 +117,7 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
     if (p?.file instanceof File) {
       filesPayload.push({ field: 'mainPhotos', file: p.file });
     } else if (p?.uploadedUrl) {
-      filesPayload.push({
-        field: 'mainPhotos',
-        file: new File([], `Main Photo ${i + 1}`), // placeholder
-      });
+      filesPayload.push({ field: 'mainPhotos', file: new File([], `Main Photo ${i + 1}`) });
     }
   });
 
@@ -139,10 +127,7 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
       filesPayload.push({ field: 'complaintFiles', file: f.file });
     } else if (f?.uploadedUrl) {
       const base = pickBestName(f, `Complaint File ${i + 1}`);
-      filesPayload.push({
-        field: 'complaintFiles',
-        file: new File([], sanitizeFilename(base)), // placeholder
-      });
+      filesPayload.push({ field: 'complaintFiles', file: new File([], sanitizeFilename(base)) });
     }
   });
 
@@ -153,10 +138,7 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
       if (p?.file instanceof File) {
         filesPayload.push({ field, file: p.file });
       } else if (p?.uploadedUrl) {
-        filesPayload.push({
-          field,
-          file: new File([], `Photo ${j + 1}`), // placeholder
-        });
+        filesPayload.push({ field, file: new File([], `Photo ${j + 1}`) });
       }
     });
   });
@@ -212,7 +194,6 @@ export async function downloadReportZip(report: PropertyReport): Promise<void> {
     }
   }
 
-  // Build PRINT-IDENTICAL HTML and let backend generate a real PDF via Chromium print
   const pdfHtml = await buildPdfHtmlFromDom('pdf-content');
   const pdfFileName = generatePdfFilename(report);
 

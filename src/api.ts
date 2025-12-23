@@ -1,3 +1,4 @@
+// src/api.ts
 import {
   Property,
   PropertySearchResponse,
@@ -38,12 +39,70 @@ async function parseErrorMessage(response: Response): Promise<string> {
 function buildUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`;
 
-  // Proxy-style base: "/api" + "/properties" => "/api/properties"
-  if (API_BASE_URL === '/api') return `${API_BASE_URL}${p}`;
+  // Proxy-style base (local dev): treat empty or "/api" as proxy
+  if (!API_BASE_URL || API_BASE_URL === '/api') return `/api${p}`;
 
-  // Full URL base: must always include "/api"
+  // Full URL base:
+  // If it already ends with "/api", do not add "/api" again
+  if (API_BASE_URL.endsWith('/api')) {
+    const stripped = p.startsWith('/api/') ? p.slice('/api'.length) : p;
+    return `${API_BASE_URL}${stripped}`;
+  }
+
+  // Otherwise ensure "/api" exists exactly once
   const apiPath = p.startsWith('/api/') ? p : `/api${p}`;
   return `${API_BASE_URL}${apiPath}`;
+}
+
+/**
+ * If backend accidentally returns JSON instead of ZIP, throw readable error.
+ * (We read it BEFORE response.blob() to avoid downloading "error json" as a file.)
+ */
+async function assertZipResponse(response: Response): Promise<void> {
+  const ct = (response.headers.get('content-type') || '').toLowerCase();
+
+  // Some platforms may return "application/json; charset=utf-8"
+  if (ct.includes('application/json') || ct.includes('text/json')) {
+    const msg = await parseErrorMessage(response);
+    throw new Error(msg || 'Bundle failed (JSON response)');
+  }
+
+  // Some errors can come as text/html
+  if (ct.includes('text/html')) {
+    const msg = await parseErrorMessage(response);
+    throw new Error(msg || 'Bundle failed (HTML response)');
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function getFilenameFromDisposition(cd: string | null, fallback: string): string {
+  const header = cd || '';
+
+  // RFC5987: filename*=UTF-8''....
+  const match = header.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
+  const raw = (match?.[1] || match?.[2] || fallback).trim();
+
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    decoded = raw;
+  }
+
+  if (!decoded) return fallback;
+  if (!decoded.toLowerCase().endsWith('.zip')) return fallback;
+  return decoded;
 }
 
 /**
@@ -163,14 +222,14 @@ export async function getReportExports(reportId: string): Promise<any> {
 
 /**
  * Generate a single ZIP bundle on the backend:
- * - PDF (prefer client "Print -> Save" PDF if provided)
+ * - PDF rendered from provided pdfHtml (Playwright print-mode)
  * - Photos/files grouped by section
  * POST /api/bundle
  *
  * Notes:
  * - Send report JSON + raw files (FormData)
  * - Backend responds with ZIP blob
- * - Downloads without navigation (prevents white screen)
+ * - Downloads without navigation
  */
 export async function downloadBundleZip(
   report: PropertyReport,
@@ -198,21 +257,14 @@ export async function downloadBundleZip(
     throw new Error(`Bundle failed: ${message}`);
   }
 
+  await assertZipResponse(response);
+
   const blob = await response.blob();
 
-  const cd = response.headers.get('content-disposition') || '';
-  const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i);
-  const filenameRaw = decodeURIComponent((match?.[1] || match?.[2] || 'bundle.zip').trim());
-  const filename = filenameRaw && filenameRaw.toLowerCase().endsWith('.zip') ? filenameRaw : 'bundle.zip';
+  const filename = getFilenameFromDisposition(
+    response.headers.get('content-disposition'),
+    'bundle.zip'
+  );
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.style.display = 'none';
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  downloadBlob(blob, filename);
 }
