@@ -18,20 +18,17 @@ const __dirname = path.dirname(__filename);
 // ============================================================================
 
 function readServiceAccountCredentials() {
-  // 1) Preferred in production (Render): env var JSON
   const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (rawJson && rawJson.trim()) {
     try {
       return JSON.parse(rawJson);
     } catch (e) {
       throw new Error(
-        'Invalid GOOGLE_SERVICE_ACCOUNT_JSON (must be valid JSON). ' +
-          'Re-paste the full service account JSON into Render env vars.'
+        'Invalid GOOGLE_SERVICE_ACCOUNT_JSON (must be valid JSON). Re-paste the full service account JSON into Render env vars.'
       );
     }
   }
 
-  // 2) Local dev fallback: file path
   const keyPath =
     process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ||
     path.join(__dirname, '../../google-credentials.json');
@@ -51,12 +48,10 @@ function readServiceAccountCredentials() {
 export function getServiceAccountAuth() {
   const credentials = readServiceAccountCredentials();
 
-  const auth = new google.auth.GoogleAuth({
+  return new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
-
-  return auth;
 }
 
 export async function getSheetsClient() {
@@ -106,16 +101,20 @@ export async function getTokensFromCode(code) {
   return tokens;
 }
 
+function getTokenPath() {
+  return (
+    process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json')
+  );
+}
+
 export function saveTokens(tokens) {
-  const tokenPath =
-    process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
+  const tokenPath = getTokenPath();
   fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
   console.log('✅ OAuth tokens saved successfully');
 }
 
 export function loadTokens() {
-  const tokenPath =
-    process.env.OAUTH_TOKEN_PATH || path.join(__dirname, '../../oauth-tokens.json');
+  const tokenPath = getTokenPath();
   if (!fs.existsSync(tokenPath)) return null;
   return JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
 }
@@ -130,7 +129,9 @@ export function getAuthenticatedOAuthClient() {
   const tokens = loadTokens();
 
   if (!tokens || !tokens.refresh_token) {
-    throw new Error('Not authenticated for Drive. Please visit /auth/login to authenticate with Google.');
+    throw new Error(
+      'Not authenticated for Drive. Please visit /auth/login to authenticate with Google.'
+    );
   }
 
   oauth2Client.setCredentials(tokens);
@@ -177,14 +178,19 @@ export function validateConfig() {
   }
 
   const hasEnvJson = Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim());
-  const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './google-credentials.json';
+  const keyPath =
+    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || './google-credentials.json';
 
   if (!hasEnvJson && !fs.existsSync(keyPath)) {
-    console.warn('⚠️  Warning: No service account credentials found. Sheets access will fail.');
+    console.warn(
+      '⚠️  Warning: No service account credentials found. Sheets access will fail.'
+    );
   }
 
   const tokenPath = process.env.OAUTH_TOKEN_PATH || './oauth-tokens.json';
   if (!fs.existsSync(tokenPath)) {
-    console.warn('⚠️  Warning: oauth-tokens.json not found. Drive access will fail until you authenticate.');
+    console.warn(
+      '⚠️  Warning: oauth-tokens.json not found. Drive access will fail until you authenticate.'
+    );
   }
 }
