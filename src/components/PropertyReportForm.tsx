@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
 import { isValidUrl } from '../utils';
-import { printReport, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
-import { downloadReportZip, validateReportForZip } from '../zipUtils';
+import { validateReportForPdf, formatBahrainDate } from '../pdfUtils';
+import { downloadBundleZip } from '../api';
+
 import PropertySearch from './PropertySearch';
 import PhotoUpload from './PhotoUpload';
 import ComplaintFileUpload from './ComplaintFileUpload';
@@ -22,13 +23,11 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
   const hasAnyFindingText = report.findings?.some((f) => hasText(f.text)) ?? false;
   const hasAnyActionText = report.actions?.some((a) => hasText(a.text)) ?? false;
 
-  const hasAnyPhotos =
+  const hasAnyFiles =
     (report.mainPhotos?.length ?? 0) > 0 ||
     (report.findings?.some((f) => (f.photos?.length ?? 0) > 0) ?? false) ||
     (report.complaintFiles?.length ?? 0) > 0;
 
-  // minimal meaningful content:
-  // - visitType chosen OR any notes/location/complaint/findings/actions OR any files
   return (
     hasText(report.visitType) ||
     hasText(report.locationDescription) ||
@@ -37,7 +36,7 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
     hasText(report.complaint) ||
     hasAnyFindingText ||
     hasAnyActionText ||
-    hasAnyPhotos
+    hasAnyFiles
   );
 }
 
@@ -67,15 +66,14 @@ export default function PropertyReportForm() {
   const [complaintFiles, setComplaintFiles] = useState<ComplaintFile[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
+
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipError, setZipError] = useState<string | null>(null);
 
-  const isMobile = useMemo(() => isProbablyMobile(), []);
-
-  // Avoid “white screen” from print on some browsers by ensuring PDF DOM exists,
-  // then printing on next frame (gives React time to paint).
   const [printQueued, setPrintQueued] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+
+  const isMobile = useMemo(() => isProbablyMobile(), []);
 
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
@@ -123,18 +121,14 @@ export default function PropertyReportForm() {
     setPdfError(null);
     setZipError(null);
     setPrintQueued(false);
+    setIsDownloadingZip(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ✅ Make export validation “soft”:
-  // - Property must be selected.
-  // - visitType required.
-  // - complaint details only required if complaint visit chosen.
-  // - locationLink only validated if user typed it.
-  // - Everything else optional (including photos/findings/actions).
+  // Soft validation: only what's logically required
   const validateForExport = (): string | null => {
     if (!selectedProperty) return 'يرجى اختيار العقار | Please select a property';
     if (!formData.visitType.trim()) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
@@ -187,7 +181,7 @@ export default function PropertyReportForm() {
     };
   };
 
-  // Print after DOM is ready (reduces blank print on some browsers)
+  // Print after DOM is ready (reduces blank print)
   useEffect(() => {
     if (!printQueued) return;
 
@@ -199,7 +193,17 @@ export default function PropertyReportForm() {
       }
 
       try {
-        await printReport(currentReport);
+        // Ensure the hidden PDF content is mounted before printing
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+        const validationError = validateReportForPdf(currentReport);
+        if (validationError) {
+          setPdfError(validationError);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        window.print();
       } catch (error: any) {
         console.error('Print error:', error);
         setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
@@ -209,8 +213,7 @@ export default function PropertyReportForm() {
       }
     };
 
-    // Two frames gives React + browser layout time before print
-    requestAnimationFrame(() => requestAnimationFrame(run));
+    run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printQueued]);
 
@@ -227,13 +230,6 @@ export default function PropertyReportForm() {
 
     if (!hasMeaningfulReportData(currentReport)) {
       setPdfError('اكتب أي بيانات أو أضف ملفات قبل الطباعة | Add some info or files before printing');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    const validationError = validateReportForPdf(currentReport);
-    if (validationError) {
-      setPdfError(validationError);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -259,18 +255,32 @@ export default function PropertyReportForm() {
       return;
     }
 
-    const validationError = validateReportForZip(currentReport);
-    if (validationError) {
-      setZipError(validationError);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
     setIsDownloadingZip(true);
     setZipError(null);
 
     try {
-      await downloadReportZip(currentReport);
+      // Build files payload for backend bundle (PDF + folders)
+      const filesPayload: Array<{ field: string; file: File }> = [];
+
+      // Main photos
+      for (const p of mainPhotos) {
+        if (p?.file) filesPayload.push({ field: 'mainPhotos', file: p.file });
+      }
+
+      // Complaint files (images/docs)
+      for (const f of complaintFiles) {
+        if (f?.file) filesPayload.push({ field: 'complaintFiles', file: f.file });
+      }
+
+      // Findings photos (keep finding index in field name so backend can folderize)
+      findings.forEach((finding, idx) => {
+        const field = `findingPhotos_${idx + 1}`;
+        (finding.photos || []).forEach((p) => {
+          if (p?.file) filesPayload.push({ field, file: p.file });
+        });
+      });
+
+      await downloadBundleZip(currentReport, filesPayload);
     } catch (error: any) {
       console.error('ZIP download error:', error);
       setZipError(error.message || 'فشل تحميل الملف. حاول مرة أخرى. | Failed to download ZIP. Try again.');
@@ -287,12 +297,7 @@ export default function PropertyReportForm() {
   const currentReportForPdf = buildCurrentReport();
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-      }}
-      className="property-report-form"
-    >
+    <form onSubmit={(e) => e.preventDefault()} className="property-report-form">
       <div className="form-header">
         <h1 className="form-title">تقرير العقار</h1>
         <p className="form-subtitle">Property Inspection Report</p>
@@ -597,7 +602,7 @@ export default function PropertyReportForm() {
 
             {isMobile && (
               <div style={{ fontSize: 12, opacity: 0.8, paddingTop: 6 }}>
-                Tip: Download ZIP and keep it. Use Print if you only need the PDF.
+                Tip: Download ZIP to keep everything together (PDF + photos).
               </div>
             )}
           </div>

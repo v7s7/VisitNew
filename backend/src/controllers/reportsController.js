@@ -10,12 +10,7 @@ function safeMsg(err) {
 
 function safeDetails(err) {
   // Prefer Google API error details when available
-  return (
-    err?.response?.data ||
-    err?.errors ||
-    err?.stack ||
-    undefined
-  );
+  return err?.response?.data || err?.errors || err?.stack || undefined;
 }
 
 /**
@@ -26,7 +21,6 @@ export async function submitReportHandler(req, res) {
   try {
     const report = req.body;
 
-    // Validate required fields
     if (!report?.propertyId || !report?.propertyCode) {
       return res.status(400).json({
         success: false,
@@ -41,7 +35,6 @@ export async function submitReportHandler(req, res) {
       });
     }
 
-    // Complaint is only required for complaint visits
     if (report.visitType === 'complaint' && !report?.complaint) {
       return res.status(400).json({
         success: false,
@@ -49,7 +42,6 @@ export async function submitReportHandler(req, res) {
       });
     }
 
-    // Save report (Sheets/DB layer)
     const result = await reportsService.saveReport(report);
 
     return res.json({
@@ -65,8 +57,8 @@ export async function submitReportHandler(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to submit report',
-      error: msg,              // IMPORTANT: surfaced to frontend (your api.ts reads message, but you can swap to error)
-      details: safeDetails(error), // Helpful for Render logs / debugging
+      error: msg,
+      details: safeDetails(error),
     });
   }
 }
@@ -195,6 +187,58 @@ export async function getExportsHandler(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch exports',
+      error: msg,
+      details: safeDetails(error),
+    });
+  }
+}
+
+/**
+ * ✅ NEW: Instant ZIP (server-generated PDF + photos) returned directly
+ * POST /api/exports
+ *
+ * Expects: report JSON in body (same shape as frontend buildCurrentReport()).
+ * Returns: application/zip as attachment.
+ */
+export async function generateInstantZipHandler(req, res) {
+  try {
+    const report = req.body;
+
+    if (!report?.propertyCode || !report?.propertyName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Property information is required',
+      });
+    }
+
+    if (!report?.visitType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Visit type is required',
+      });
+    }
+
+    if (report.visitType === 'complaint' && !report?.complaint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Complaint is required for complaint visits',
+      });
+    }
+
+    const { zipBuffer, zipFileName } = await exportsService.generateInstantZipBuffer(report);
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"`);
+    res.setHeader('Content-Length', String(zipBuffer.length));
+
+    return res.status(200).send(zipBuffer);
+  } catch (error) {
+    const msg = safeMsg(error);
+    console.error('Instant ZIP export error (full):', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate ZIP',
       error: msg,
       details: safeDetails(error),
     });

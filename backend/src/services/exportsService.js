@@ -12,11 +12,9 @@ import { getDriveClient } from '../config/google-hybrid.js';
  *   Main / <Property Folder> / <YYYY-MM-DD> / Exports /
  *
  * IMPORTANT:
- * - This file is self-contained and does NOT require driveService.js to export special helpers.
- * - It reuses your Drive folder rules:
- *   - Property folder: reused
- *   - Date folder: reused
- *   - Exports folder: reused
+ * - Self-contained (no driveService.js dependency)
+ * - Defensive: should NOT white-screen the frontend.
+ *   All errors are thrown with clear messages, controllers should return JSON safely.
  */
 
 function safeStr(v) {
@@ -50,16 +48,13 @@ function getReportDate(report) {
 function normalizeReportForExports(report) {
   const mainPhotosUrls =
     report.mainPhotosUrls ||
-    (report.mainPhotos || [])
+    ((report.mainPhotos || [])
       .map((p) => p?.uploadedUrl || p?.url)
-      .filter(Boolean) ||
+      .filter(Boolean)) ||
     [];
 
   const complaintFiles = Array.isArray(report.complaintFiles) ? report.complaintFiles : [];
-
-  const complaintFileUrls = complaintFiles
-    .map((f) => f?.url || f?.uploadedUrl)
-    .filter(Boolean);
+  const complaintFileUrls = complaintFiles.map((f) => f?.url || f?.uploadedUrl).filter(Boolean);
 
   const findingsRaw = Array.isArray(report.findings) ? report.findings : [];
   const findings = findingsRaw.map((f, idx) => {
@@ -209,7 +204,9 @@ function buildReportHtml(r) {
       r.locationLink
         ? `<div class="row">
             <div class="label">Location Link</div>
-            <div class="value"><a href="${htmlEscape(r.locationLink)}">${htmlEscape(r.locationLink)}</a></div>
+            <div class="value"><a href="${htmlEscape(r.locationLink)}">${htmlEscape(
+            r.locationLink
+          )}</a></div>
           </div>`
         : ''
     }
@@ -220,7 +217,9 @@ function buildReportHtml(r) {
     <div class="row"><div class="label">Visit Type</div><div class="value">${htmlEscape(r.visitType)}</div></div>
     ${
       r.complaint
-        ? `<div class="row"><div class="label">Complaint</div><div class="value">${htmlEscape(r.complaint)}</div></div>`
+        ? `<div class="row"><div class="label">Complaint</div><div class="value">${htmlEscape(
+            r.complaint
+          )}</div></div>`
         : ''
     }
   </div>
@@ -231,12 +230,11 @@ function buildReportHtml(r) {
       findings.length
         ? `<ul>
             ${findings
-              .map(
-                (f) =>
-                  `<li><b>Finding ${f.index}:</b> ${htmlEscape(f.text)} <span class="muted small">(photos: ${
-                    (f.photos || []).length
-                  })</span></li>`
-              )
+              .map((f) => {
+                const photoCount = (f.photos || []).length;
+                return `<li><b>Finding ${f.index}:</b> ${htmlEscape(f.text)}
+                  <span class="muted small">(photos: ${photoCount})</span></li>`;
+              })
               .join('')}
           </ul>`
         : `<div class="muted">No findings</div>`
@@ -262,24 +260,28 @@ function buildReportHtml(r) {
   <h2>Meta</h2>
   <div class="box">
     <div class="grid">
-      <div class="row"><div class="label">Inspector</div><div class="value">${htmlEscape(r.inspectorName)}</div></div>
-      <div class="row"><div class="label">Corrector</div><div class="value">${htmlEscape(r.corrector)}</div></div>
+      <div class="row"><div class="label">Inspector</div><div class="value">${htmlEscape(
+        r.inspectorName
+      )}</div></div>
+      <div class="row"><div class="label">Corrector</div><div class="value">${htmlEscape(
+        r.corrector
+      )}</div></div>
     </div>
   </div>
 
   <div class="muted small" style="margin-top: 10px;">
-    Evidence files are packaged separately in the ZIP export.
+    Evidence files are packaged in the ZIP export.
   </div>
 </body>
 </html>`;
 }
 
 async function generatePdfBuffer(report) {
-  // Lazy import so server can still boot if Playwright isn't installed yet.
-  const { chromium } = await import('playwright');
-
   const r = normalizeReportForExports(report);
   const html = buildReportHtml(r);
+
+  // Lazy import so server can boot even if Playwright is not present until used.
+  const { chromium } = await import('playwright');
 
   const browser = await chromium.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -307,75 +309,105 @@ async function zipToBuffer(addFilesFn) {
     const stream = new PassThrough();
     const chunks = [];
 
+    const fail = (err) => reject(err);
+
     stream.on('data', (c) => chunks.push(c));
     stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
+    stream.on('error', fail);
 
     archive.on('warning', (err) => {
       console.warn('ZIP warning:', err?.message || err);
     });
-    archive.on('error', reject);
+    archive.on('error', fail);
 
     archive.pipe(stream);
 
     Promise.resolve()
       .then(() => addFilesFn(archive))
       .then(() => archive.finalize())
-      .catch(reject);
+      .catch(fail);
   });
 }
 
-async function generateZipBuffer(report) {
+async function generateZipBuffer(report, options = {}) {
   const r = normalizeReportForExports(report);
+  const includePdfInsideZip = options.includePdfInsideZip !== false;
 
   const addUrlAsFile = async (archive, url, pathInZip, fallbackName) => {
     const fileId = extractDriveFileId(url);
-    if (!fileId) return;
+    if (!fileId) return { ok: false, skipped: true };
 
     const meta = await resolveNameFromDrive(fileId);
     const name = sanitizeFileName(meta.name || fallbackName || `file-${fileId}`);
 
     const buf = await downloadDriveFileToBuffer(fileId);
     archive.append(buf, { name: `${pathInZip}/${name}` });
+
+    return { ok: true };
   };
 
   const zipBuffer = await zipToBuffer(async (archive) => {
-    // Main Photos
+    // 1) PDF INSIDE ZIP (so frontend ZIP contains PDF too)
+    if (includePdfInsideZip) {
+      const { pdfName } = buildExportNames(r);
+      const pdfBuffer = await generatePdfBuffer(r);
+      archive.append(pdfBuffer, { name: sanitizeFileName(pdfName) });
+    }
+
+    // 2) Main Photos
     if (r.mainPhotosUrls?.length) {
       for (let i = 0; i < r.mainPhotosUrls.length; i++) {
-        await addUrlAsFile(archive, r.mainPhotosUrls[i], 'Main Photos', `main-${i + 1}`);
+        try {
+          await addUrlAsFile(archive, r.mainPhotosUrls[i], 'Main Photos', `main-${i + 1}`);
+        } catch (e) {
+          console.warn(`Failed to add main photo ${i + 1}:`, e?.message || e);
+        }
       }
     }
 
-    // Complaint Files
+    // 3) Complaint Files
     if (r.complaintFiles?.length) {
       for (let i = 0; i < r.complaintFiles.length; i++) {
         const f = r.complaintFiles[i];
         const url = f?.url || f?.uploadedUrl;
         if (!url) continue;
-
-        const preferredName = f?.name || `complaint-${i + 1}`;
-        await addUrlAsFile(archive, url, 'Complaint Files', preferredName);
+        try {
+          const preferredName = f?.name || `complaint-${i + 1}`;
+          await addUrlAsFile(archive, url, 'Complaint Files', preferredName);
+        } catch (e) {
+          console.warn(`Failed to add complaint file ${i + 1}:`, e?.message || e);
+        }
       }
     } else if (r.complaintFileUrls?.length) {
       for (let i = 0; i < r.complaintFileUrls.length; i++) {
-        await addUrlAsFile(archive, r.complaintFileUrls[i], 'Complaint Files', `complaint-${i + 1}`);
+        try {
+          await addUrlAsFile(archive, r.complaintFileUrls[i], 'Complaint Files', `complaint-${i + 1}`);
+        } catch (e) {
+          console.warn(`Failed to add complaint url ${i + 1}:`, e?.message || e);
+        }
       }
     }
 
-    // Findings photos
+    // 4) Findings photos
     if (r.findings?.length) {
       for (const f of r.findings) {
         const folderName =
           sanitizeFileName(`Finding ${f.index} - ${f.text || ''}`) || `Finding ${f.index}`;
         const photos = f.photos || [];
         for (let i = 0; i < photos.length; i++) {
-          await addUrlAsFile(
-            archive,
-            photos[i],
-            `Findings/${folderName}`,
-            `finding-${f.index}-${i + 1}`
-          );
+          try {
+            await addUrlAsFile(
+              archive,
+              photos[i],
+              `Findings/${folderName}`,
+              `finding-${f.index}-${i + 1}`
+            );
+          } catch (e) {
+            console.warn(
+              `Failed to add finding ${f.index} photo ${i + 1}:`,
+              e?.message || e
+            );
+          }
         }
       }
     }
@@ -387,10 +419,11 @@ async function generateZipBuffer(report) {
       `Date: ${safeStr(r.submitDate)}`,
       `Property: ${safeStr(r.propertyCode)} - ${safeStr(r.propertyName)}`,
       ``,
-      `Folders:`,
-      `- Main Photos`,
-      `- Complaint Files`,
-      `- Findings/<Finding N - ...>`,
+      `Contents:`,
+      `- (Root) PDF report`,
+      `- Main Photos/`,
+      `- Complaint Files/`,
+      `- Findings/<Finding N - ...>/`,
       ``,
       `Generated by backend exports service.`,
       ``,
@@ -405,6 +438,7 @@ async function generateZipBuffer(report) {
 function buildExportNames(report) {
   const r = normalizeReportForExports(report);
   const date = getReportDate(r);
+
   const base =
     sanitizeFileName(`${r.propertyCode} - ${r.propertyName} - ${date}`) ||
     sanitizeFileName(`${r.propertyCode} - ${date}`) ||
@@ -412,6 +446,7 @@ function buildExportNames(report) {
 
   const pdfName = `${base} - Report.pdf`;
   const zipName = `${base} - Evidence.zip`;
+
   return { base, pdfName, zipName };
 }
 
@@ -452,7 +487,6 @@ async function ensureExportsFolder(propertyCode, propertyType, endowedTo, dateSt
   const propertyFolder = await getOrCreateFolder(mainFolderId, propertyFolderName);
 
   const dateFolder = await getOrCreateFolder(propertyFolder.id, today);
-
   const exportsFolder = await getOrCreateFolder(dateFolder.id, 'Exports');
 
   return {
@@ -491,7 +525,7 @@ async function uploadBufferToDrive(buffer, fileName, mimeType, parentFolderId) {
 
 /**
  * Generate PDF + ZIP and upload both to Drive under Exports folder.
- * Returns URLs for phone users to open/share and later download on PC.
+ * ZIP will ALSO contain the PDF inside it.
  */
 export async function generateAndUploadExports(report) {
   const r = normalizeReportForExports(report);
@@ -501,10 +535,13 @@ export async function generateAndUploadExports(report) {
   }
 
   const { pdfName, zipName } = buildExportNames(r);
-
   const folders = await ensureExportsFolder(r.propertyCode, r.propertyType, r.endowedTo, getReportDate(r));
 
-  const [pdfBuffer, zipBuffer] = await Promise.all([generatePdfBuffer(r), generateZipBuffer(r)]);
+  // Generate PDF and ZIP (zip includes pdf inside)
+  const [pdfBuffer, zipBuffer] = await Promise.all([
+    generatePdfBuffer(r),
+    generateZipBuffer(r, { includePdfInsideZip: true }),
+  ]);
 
   const pdfUpload = await uploadBufferToDrive(pdfBuffer, pdfName, 'application/pdf', folders.exportsFolderId);
   const zipUpload = await uploadBufferToDrive(zipBuffer, zipName, 'application/zip', folders.exportsFolderId);
@@ -518,6 +555,24 @@ export async function generateAndUploadExports(report) {
     pdf: pdfUpload,
     zip: zipUpload,
   };
+}
+
+/**
+ * Backend-only bundle ZIP buffer (for /api/bundle):
+ * - Contains PDF report + all evidence files.
+ * - Return buffer so controller can `res.type('application/zip').send(buf)`.
+ */
+export async function generateBundleZipBuffer(report) {
+  const r = normalizeReportForExports(report);
+  return await generateZipBuffer(r, { includePdfInsideZip: true });
+}
+
+/**
+ * Backend-only PDF buffer (for /api/pdf or inline download).
+ */
+export async function generatePdfOnlyBuffer(report) {
+  const r = normalizeReportForExports(report);
+  return await generatePdfBuffer(r);
 }
 
 /**
@@ -542,7 +597,6 @@ export async function getExistingExports(report) {
   });
 
   const files = resp.data.files || [];
-
   const pdf = files.find((f) => safeStr(f.name).toLowerCase().endsWith('.pdf'));
   const zip = files.find((f) => safeStr(f.name).toLowerCase().endsWith('.zip'));
 
