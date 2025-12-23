@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
 import { isValidUrl } from '../utils';
 import { printReport, validateReportForPdf, formatBahrainDate } from '../pdfUtils';
@@ -15,6 +15,30 @@ function isProbablyMobile() {
   if (typeof window === 'undefined') return false;
   const ua = navigator.userAgent || '';
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || window.innerWidth < 768;
+}
+
+function hasMeaningfulReportData(report: PropertyReport): boolean {
+  const hasText = (v?: string) => !!(v && v.trim());
+  const hasAnyFindingText = report.findings?.some((f) => hasText(f.text)) ?? false;
+  const hasAnyActionText = report.actions?.some((a) => hasText(a.text)) ?? false;
+
+  const hasAnyPhotos =
+    (report.mainPhotos?.length ?? 0) > 0 ||
+    (report.findings?.some((f) => (f.photos?.length ?? 0) > 0) ?? false) ||
+    (report.complaintFiles?.length ?? 0) > 0;
+
+  // minimal meaningful content:
+  // - visitType chosen OR any notes/location/complaint/findings/actions OR any files
+  return (
+    hasText(report.visitType) ||
+    hasText(report.locationDescription) ||
+    hasText(report.locationLink) ||
+    hasText(report.additionalNotes) ||
+    hasText(report.complaint) ||
+    hasAnyFindingText ||
+    hasAnyActionText ||
+    hasAnyPhotos
+  );
 }
 
 export default function PropertyReportForm() {
@@ -48,6 +72,10 @@ export default function PropertyReportForm() {
   const [zipError, setZipError] = useState<string | null>(null);
 
   const isMobile = useMemo(() => isProbablyMobile(), []);
+
+  // Avoid “white screen” from print on some browsers by ensuring PDF DOM exists,
+  // then printing on next frame (gives React time to paint).
+  const [printQueued, setPrintQueued] = useState(false);
 
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
@@ -94,13 +122,20 @@ export default function PropertyReportForm() {
     setActions([]);
     setPdfError(null);
     setZipError(null);
+    setPrintQueued(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const validateFormForLocalExport = (): string | null => {
+  // ✅ Make export validation “soft”:
+  // - Property must be selected.
+  // - visitType required.
+  // - complaint details only required if complaint visit chosen.
+  // - locationLink only validated if user typed it.
+  // - Everything else optional (including photos/findings/actions).
+  const validateForExport = (): string | null => {
     if (!selectedProperty) return 'يرجى اختيار العقار | Please select a property';
     if (!formData.visitType.trim()) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
 
@@ -110,22 +145,6 @@ export default function PropertyReportForm() {
 
     if (formData.locationLink && !isValidUrl(formData.locationLink)) {
       return 'رابط الموقع غير صحيح | Invalid location link';
-    }
-
-    if (mainPhotos.length === 0) {
-      return 'يرجى إضافة صورة واحدة على الأقل | Please add at least one photo';
-    }
-
-    for (const finding of findings) {
-      if (!finding.text.trim()) {
-        return 'يرجى كتابة وصف لجميع الملاحظات | Please add description for all findings';
-      }
-    }
-
-    for (const action of actions) {
-      if (!action.text.trim()) {
-        return 'يرجى كتابة وصف لجميع الإجراءات | Please add description for all actions';
-      }
     }
 
     return null;
@@ -168,13 +187,46 @@ export default function PropertyReportForm() {
     };
   };
 
+  // Print after DOM is ready (reduces blank print on some browsers)
+  useEffect(() => {
+    if (!printQueued) return;
+
+    const run = async () => {
+      const currentReport = buildCurrentReport();
+      if (!currentReport) {
+        setPrintQueued(false);
+        return;
+      }
+
+      try {
+        await printReport(currentReport);
+      } catch (error: any) {
+        console.error('Print error:', error);
+        setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } finally {
+        setPrintQueued(false);
+      }
+    };
+
+    // Two frames gives React + browser layout time before print
+    requestAnimationFrame(() => requestAnimationFrame(run));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printQueued]);
+
   const handlePrint = async () => {
     const currentReport = buildCurrentReport();
     if (!currentReport) return;
 
-    const baseValidation = validateFormForLocalExport();
+    const baseValidation = validateForExport();
     if (baseValidation) {
       setPdfError(baseValidation);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!hasMeaningfulReportData(currentReport)) {
+      setPdfError('اكتب أي بيانات أو أضف ملفات قبل الطباعة | Add some info or files before printing');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -187,23 +239,22 @@ export default function PropertyReportForm() {
     }
 
     setPdfError(null);
-
-    try {
-      await printReport(currentReport);
-    } catch (error: any) {
-      console.error('Print error:', error);
-      setPdfError(error.message || 'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setPrintQueued(true);
   };
 
   const handleDownloadZip = async () => {
     const currentReport = buildCurrentReport();
     if (!currentReport) return;
 
-    const baseValidation = validateFormForLocalExport();
+    const baseValidation = validateForExport();
     if (baseValidation) {
       setZipError(baseValidation);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!hasMeaningfulReportData(currentReport)) {
+      setZipError('اكتب أي بيانات أو أضف ملفات قبل التحميل | Add some info or files before downloading');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -230,7 +281,7 @@ export default function PropertyReportForm() {
   };
 
   const isFormDisabled = !selectedProperty;
-  const isPrintButtonDisabled = !selectedProperty;
+  const isPrintButtonDisabled = !selectedProperty || printQueued;
   const isZipButtonDisabled = !selectedProperty || isDownloadingZip;
 
   const currentReportForPdf = buildCurrentReport();
@@ -517,7 +568,14 @@ export default function PropertyReportForm() {
               disabled={isPrintButtonDisabled}
               title="طباعة أو حفظ كـ PDF | Print or Save as PDF"
             >
-              🖨️ طباعة / Print
+              {printQueued ? (
+                <>
+                  <span className="loading"></span>
+                  <span>جاري التحضير...</span>
+                </>
+              ) : (
+                '🖨️ طباعة / Print'
+              )}
             </button>
 
             <button

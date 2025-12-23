@@ -1,10 +1,5 @@
 import { PropertyReport } from './types';
 
-/**
- * Format date/time in Bahrain timezone
- * @param date - Date to format (defaults to current date)
- * @returns Formatted date string: YYYY-MM-DD HH:mm (Asia/Bahrain)
- */
 export function formatBahrainDate(date: Date = new Date()): string {
   const options: Intl.DateTimeFormatOptions = {
     timeZone: 'Asia/Bahrain',
@@ -28,11 +23,6 @@ export function formatBahrainDate(date: Date = new Date()): string {
   return `${year}-${month}-${day} ${hour}:${minute} (Asia/Bahrain)`;
 }
 
-/**
- * Get date in YYYY-MM-DD format for Bahrain timezone
- * @param date - Date to format (defaults to current date)
- * @returns Date string in YYYY-MM-DD format
- */
 export function getBahrainDateString(date: Date = new Date()): string {
   const options: Intl.DateTimeFormatOptions = {
     timeZone: 'Asia/Bahrain',
@@ -51,11 +41,6 @@ export function getBahrainDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Sanitize filename by removing invalid characters
- * @param filename - Filename to sanitize
- * @returns Sanitized filename
- */
 export function sanitizeFilename(filename: string): string {
   return (filename || '')
     .replace(/[/\\:*?"<>|]/g, '-')
@@ -63,35 +48,22 @@ export function sanitizeFilename(filename: string): string {
     .trim();
 }
 
-/**
- * Generate PDF filename in the required format
- * Format: "<propertyCode> - <propertyName> - <YYYY-MM-DD>.pdf"
- * @param report - Property report
- * @returns Sanitized PDF filename
- */
 export function generatePdfFilename(report: PropertyReport): string {
   const dateString = report?.submittedAt
     ? getBahrainDateString(new Date(report.submittedAt))
     : getBahrainDateString();
 
-  const code = (report?.propertyCode || '').trim() || 'UNKNOWN';
+  const code = (report?.propertyCode || '').trim() || 'Report';
   const name = (report?.propertyName || '').trim() || 'Property';
 
-  const filename = `${code} - ${name} - ${dateString}.pdf`;
-  return sanitizeFilename(filename);
+  return sanitizeFilename(`${code} - ${name} - ${dateString}.pdf`);
 }
 
-/**
- * Print report (user can save as PDF from browser's print dialog)
- * @param report - Property report to print
- */
 export async function printReport(report: PropertyReport): Promise<void> {
   const filename = generatePdfFilename(report);
   const originalTitle = document.title;
 
-  // Some browsers use document.title as suggested filename
   document.title = filename;
-
   try {
     window.print();
   } finally {
@@ -102,14 +74,9 @@ export async function printReport(report: PropertyReport): Promise<void> {
 }
 
 /**
- * Validate if report has minimum required fields for PDF generation
- * @param report - Property report
- * @returns Error message if validation fails, null if valid
+ * Everything optional: only block if no report (no property selected).
  */
 export function validateReportForPdf(report: PropertyReport | null): string | null {
   if (!report) return 'يرجى اختيار عقار أولاً | Please select a property first';
-  if (!report.propertyCode || !report.propertyName) {
-    return 'بيانات العقار غير مكتملة | Property info is incomplete';
-  }
   return null;
 }
