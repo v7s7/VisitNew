@@ -18,7 +18,6 @@ const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'https://visit-prop-6i8s.vercel.app',
-  'https://visit-prop.vercel.app'
 ];
 
 const envOrigins = [
@@ -55,8 +54,8 @@ app.use(
 );
 
 // Middleware - Increased limits for large file uploads
-app.use(express.json({ limit: '100mb' })); // Increased from 50mb
-app.use(express.urlencoded({ extended: true, limit: '100mb' })); // Increased from 50mb
+app.use(express.json({ limit: '500mb' })); // Large enough for embedded images in JSON
+app.use(express.urlencoded({ extended: true, limit: '500mb', parameterLimit: 50000 })); // Added parameterLimit
 
 // Request logging
 app.use((req, res, next) => {
@@ -89,8 +88,8 @@ app.use((err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'File too large',
-        message: 'Maximum file size is 50MB',
-        details: `The uploaded file exceeds the 50MB size limit`,
+        message: 'Maximum file size is 1GB',
+        details: `The uploaded file exceeds the 1GB size limit`,
         code: 'LIMIT_FILE_SIZE',
       });
     } else if (err.code === 'LIMIT_FILE_COUNT') {
@@ -174,8 +173,9 @@ async function startServer() {
       console.log('   ✅ *.vercel.app (preview deployments)');
       console.log('');
       console.log('📦 File Upload Limits:');
-      console.log('   ✅ Max file size: 50MB');
-      console.log('   ✅ Max body size: 100MB');
+      console.log('   ✅ Max file size: 1GB');
+      console.log('   ✅ Max body size: 500MB');
+      console.log('   ✅ Max field size: 100MB (for pdfHtml)');
       console.log('   ✅ Allowed: Images, PDF, Word, Excel, CSV, Text');
       console.log('');
       console.log('✨ Ready to accept requests!');
