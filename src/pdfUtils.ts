@@ -1,7 +1,7 @@
 // src/pdfUtils.ts
 import { PropertyReport } from './types';
 
-function sanitizeFilename(filename: string): string {
+export function sanitizeFilename(filename: string): string {
   return (filename || '')
     .replace(/[/\\:*?"<>|]/g, '-')
     .replace(/\s+/g, ' ')
@@ -34,6 +34,7 @@ export function generatePdfFilename(report: PropertyReport): string {
   const dateStr = report.submittedAt
     ? getBahrainDateString(new Date(report.submittedAt))
     : getBahrainDateString();
+
   const code = sanitizeFilename(report.propertyCode || 'Report');
   const name = sanitizeFilename(report.propertyName || 'Property');
   return `${code} - ${name} - ${dateStr}.pdf`;
@@ -87,7 +88,7 @@ function collectCssText(): string {
       if (!rules) continue;
       for (const r of Array.from(rules)) css += `${r.cssText}\n`;
     } catch {
-      // cross-origin stylesheet; ignore
+      // ignore cross-origin
     }
   }
   return css;
@@ -99,11 +100,9 @@ async function buildPrintHtmlFromDom(elementId: string, title: string): Promise<
 
   const clone = el.cloneNode(true) as HTMLElement;
 
-  // 🔧 Critical: remove the hidden/offscreen class so it prints (fixes blank white page)
   clone.classList.remove('pdf-content-hidden');
   clone.removeAttribute('aria-hidden');
 
-  // Force visible in the print window
   clone.style.display = 'block';
   clone.style.visibility = 'visible';
   clone.style.position = 'static';
@@ -123,7 +122,6 @@ async function buildPrintHtmlFromDom(elementId: string, title: string): Promise<
     html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff !important; }
 
-    /* Force-show the PDF container (fixes "prints blank" when it was hidden/offscreen) */
     #${elementId},
     .pdf-content-hidden {
       display: block !important;
@@ -138,7 +136,6 @@ async function buildPrintHtmlFromDom(elementId: string, title: string): Promise<
       overflow: visible !important;
     }
 
-    /* Reduce common causes of extra blank page */
     * { box-shadow: none !important; }
     img { max-width: 100% !important; height: auto !important; }
     body > *:last-child { page-break-after: auto !important; break-after: auto !important; }
@@ -157,7 +154,6 @@ async function buildPrintHtmlFromDom(elementId: string, title: string): Promise<
 <body>
   ${clone.outerHTML}
   <script>
-    // Close after printing (fallback if afterprint doesn't fire)
     window.addEventListener('afterprint', () => { try { window.close(); } catch (e) {} }, { once: true });
     setTimeout(() => { try { window.close(); } catch (e) {} }, 2000);
   </script>
@@ -177,9 +173,7 @@ async function waitForWindowAssets(w: Window): Promise<void> {
       // @ts-ignore
       await w.document.fonts.ready;
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   const imgs = Array.from(w.document.images || []);
   await Promise.all(
