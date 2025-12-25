@@ -1,4 +1,3 @@
-// src/pdfUtils.ts
 import { PropertyReport } from './types';
 
 export function sanitizeFilename(filename: string): string {
@@ -27,7 +26,13 @@ function getBahrainDateString(date: Date = new Date()): string {
 }
 
 export function formatBahrainDate(date: Date = new Date()): string {
-  return getBahrainDateString(date);
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Bahrain',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  };
+  return new Intl.DateTimeFormat('en-GB', options).format(date);
 }
 
 export function generatePdfFilename(report: PropertyReport): string {
@@ -37,27 +42,24 @@ export function generatePdfFilename(report: PropertyReport): string {
 
   const code = sanitizeFilename(report.propertyCode || 'Report');
   const name = sanitizeFilename(report.propertyName || 'Property');
-
   return `${code} - ${name} - ${dateStr}.pdf`;
 }
 
 export function validateReportForPdf(report: PropertyReport | null): string | null {
   if (!report) return 'لا يوجد تقرير للطباعة | No report to print';
 
-  const visitType = String(report.visitType || '').trim();
-  if (!visitType) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
+  // Only validate DOM existence (you already validate fields in the form)
+  const root = document.getElementById('pdf-content');
+  if (!root) return 'عنصر الطباعة غير موجود | Printable element not found (#pdf-content)';
 
-  if (visitType === 'complaint') {
-    const complaint = String(report.complaint || '').trim();
-    if (!complaint) return 'يرجى كتابة تفاصيل البلاغ | Please enter complaint details';
-  }
+  const inner = root.querySelector('.pdf-report');
+  if (!inner) return 'محتوى التقرير غير موجود | Report content not found (.pdf-report)';
 
   return null;
 }
 
 async function inlineImages(root: HTMLElement): Promise<void> {
   const imgs = Array.from(root.querySelectorAll('img'));
-
   await Promise.all(
     imgs.map(async (img) => {
       const src = img.getAttribute('src') || '';
@@ -66,18 +68,18 @@ async function inlineImages(root: HTMLElement): Promise<void> {
       try {
         const resp = await fetch(src, { mode: 'cors' });
         if (!resp.ok) return;
-
         const blob = await resp.blob();
+
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
+          reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
 
         img.setAttribute('src', dataUrl);
       } catch {
-        // ignore
+        // ignore (CORS / network)
       }
     })
   );
@@ -98,111 +100,94 @@ function collectCssText(): string {
 }
 
 async function buildPrintHtmlFromDom(elementId: string, title: string): Promise<string> {
-  const el = document.getElementById(elementId);
-  if (!el) throw new Error(`Printable element #${elementId} not found`);
+  const host = document.getElementById(elementId);
+  if (!host) throw new Error(`Printable element #${elementId} not found`);
 
-  const clone = el.cloneNode(true) as HTMLElement;
+  // ✅ Print the actual report node, not the hidden wrapper
+  const printableNode = (host.querySelector('.pdf-report') as HTMLElement) || host;
+  const clone = printableNode.cloneNode(true) as HTMLElement;
 
-  // Remove hiding class if present (your DOM uses className="pdf-content-hidden")
-  try {
-    clone.classList.remove('pdf-content-hidden');
-  } catch {}
-
-  clone.removeAttribute('aria-hidden');
-
-  // Force visible and normal flow (prevents white/blank + prevents clipping to viewport)
   clone.style.display = 'block';
   clone.style.visibility = 'visible';
   clone.style.position = 'static';
-  clone.style.left = 'auto';
-  clone.style.top = 'auto';
-  clone.style.width = 'auto';
-  clone.style.height = 'auto';
-  clone.style.maxHeight = 'none';
-  clone.style.overflow = 'visible';
 
   await inlineImages(clone);
 
   const css = collectCssText();
 
-  // Aggressive print overrides to prevent:
-  // - hidden/offscreen container styles
-  // - fixed heights/overflow hidden causing "only first page printed"
-  // - transforms/scale used for preview
+  // ✅ Print-only overrides (do NOT touch your original CSS file)
   const hardPrintFixCss = `
-    @page { size: A4; margin: 14mm; }
+    @page { size: A4 portrait; margin: 15mm 12mm; }
 
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      height: auto !important;
-      min-height: 0 !important;
-      overflow: visible !important;
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+      }
+
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        display: block !important;
+      }
+
+      /* Neutralize "hidden/offscreen" wrappers that clip printing */
+      #${elementId},
+      .pdf-content-hidden {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        clip: auto !important;
+        clip-path: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: block !important;
+        transform: none !important;
+      }
+
+      /* ✅ Allow multi-page pagination */
+      .pdf-report {
+        width: auto !important;
+        max-width: none !important;
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+      }
+
+      /* ✅ This is the main cause of "only 1 page" in many cases */
+      .pdf-section {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+
+      /* Keep small blocks together */
+      .pdf-photo-item,
+      .pdf-finding {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      img {
+        max-width: 100% !important;
+        height: auto !important;
+      }
     }
-
-    body {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      background: #fff !important;
-    }
-
-    /* Ensure the hidden container never hides in print window */
-    .pdf-content-hidden {
-      position: static !important;
-      left: auto !important;
-      top: auto !important;
-      width: auto !important;
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      visibility: visible !important;
-      display: block !important;
-    }
-
-    /* Core: allow content to flow across pages */
-    #${elementId} {
-      position: static !important;
-      width: auto !important;
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      transform: none !important;
-      zoom: 1 !important;
-      contain: none !important;
-    }
-
-    #${elementId} * {
-      overflow: visible !important;
-      max-height: none !important;
-      transform: none !important;
-      contain: none !important;
-    }
-
-    /* Common “A4 preview page” classnames — if your PDF view uses fixed-height pages */
-    .page, .a4, .a4-page, .pdf-page, .pdfPage, .print-page, [data-page] {
-      height: auto !important;
-      min-height: 0 !important;
-      max-height: none !important;
-      overflow: visible !important;
-      box-shadow: none !important;
-      margin: 0 !important;
-    }
-
-    /* Make sure images don’t overflow horizontally */
-    img { max-width: 100% !important; height: auto !important; }
-
-    /* Avoid accidental blank trailing page from forced breaks */
-    #${elementId} { page-break-after: auto !important; break-after: auto !important; }
   `;
-
-  const safeTitle = sanitizeFilename(title);
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>${safeTitle}</title>
+  <title>${title}</title>
   <base href="${window.location.origin}/" />
   <style>${css}</style>
   <style>${hardPrintFixCss}</style>
@@ -241,21 +226,18 @@ async function waitForWindowAssets(w: Window): Promise<void> {
             })
     )
   );
-
-  // Extra paint tick so layout is final before print
-  await new Promise<void>((resolve) => w.requestAnimationFrame(() => w.requestAnimationFrame(() => resolve())));
 }
 
 export async function printReport(report: PropertyReport | null) {
   if (!report) return;
 
-  const validation = validateReportForPdf(report);
-  if (validation) throw new Error(validation);
+  const domError = validateReportForPdf(report);
+  if (domError) throw new Error(domError);
 
   const title = sanitizeFilename(generatePdfFilename(report).replace(/\.pdf$/i, ''));
   const html = await buildPrintHtmlFromDom('pdf-content', title);
 
-  const w = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=700');
+  const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=650');
   if (!w) throw new Error('Popup blocked');
 
   w.document.open();
@@ -264,19 +246,15 @@ export async function printReport(report: PropertyReport | null) {
 
   await waitForWindowAssets(w);
 
-  w.focus();
+  // small delay helps Chrome paginate before print
+  await new Promise((r) => setTimeout(r, 80));
 
-  // Close after printing (with fallback)
-  const closeSafe = () => {
+  w.focus();
+  w.print();
+
+  setTimeout(() => {
     try {
       w.close();
     } catch {}
-  };
-
-  w.addEventListener('afterprint', closeSafe, { once: true });
-
-  w.print();
-
-  // Fallback close (some browsers don’t fire afterprint reliably)
-  setTimeout(closeSafe, 1500);
+  }, 600);
 }
