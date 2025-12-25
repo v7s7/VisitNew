@@ -121,36 +121,12 @@ export default function PropertyReportForm() {
     style.id = styleId;
     style.textContent = `
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 15mm 12mm;
-  }
-
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  html {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  body {
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: white !important;
-  }
-
-  /* Hide everything except PDF content */
-  body > * {
+  /* Hide form, show only PDF content */
+  .property-report-form > * {
     display: none !important;
   }
 
-  /* Show only PDF content */
-  body > #pdf-content {
+  .property-report-form #pdf-content {
     display: block !important;
   }
 
@@ -159,57 +135,11 @@ export default function PropertyReportForm() {
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
-    max-width: 100% !important;
     height: auto !important;
-    min-height: 0 !important;
     visibility: visible !important;
     opacity: 1 !important;
     overflow: visible !important;
-    background: white !important;
     z-index: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  /* Report container */
-  .pdf-report {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    margin: 0 !important;
-    padding: 10mm 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Allow all sections to break naturally */
-  .pdf-section,
-  .pdf-header,
-  .pdf-field-grid,
-  .pdf-photo-grid {
-    page-break-inside: auto !important;
-    break-inside: auto !important;
-  }
-
-  /* Try to keep these together but allow break if needed */
-  .pdf-photo-item {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .pdf-finding {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-bottom: 10px !important;
-  }
-
-  /* Ensure images don't cause overflow */
-  img {
-    max-width: 100% !important;
-    height: auto !important;
-    page-break-inside: avoid !important;
   }
 }
     `.trim();

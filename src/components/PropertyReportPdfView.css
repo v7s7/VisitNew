@@ -1,7 +1,7 @@
 /* PDF Report Styles */
 .pdf-report {
-  width: 210mm; /* A4 width */
-  min-height: 297mm; /* A4 height */
+  width: 210mm;
+  min-height: auto;
   padding: 10mm 15mm;
   margin: 0 auto;
   background: #ffffff;
@@ -49,7 +49,7 @@
 /* Sections */
 .pdf-section {
   margin-bottom: 20px;
-  page-break-inside: avoid;
+  page-break-inside: auto;
 }
 
 .pdf-section-title {
@@ -210,19 +210,18 @@
 
 /* Print-specific styles */
 @media print {
-  /* Remove browser header/footer */
   @page {
     size: A4 portrait;
     margin: 15mm 12mm;
   }
 
-  /* ✅ CRITICAL: allow pagination (prevents "only first page printed") */
   html,
   body {
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
     overflow: visible !important;
+    background: white !important;
   }
 
   body {
@@ -231,29 +230,32 @@
   }
 
   .pdf-report {
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
-    margin: 0;
-    box-shadow: none;
-
-    /* ✅ CRITICAL: prevents extra blank page + prevents clipping */
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
     min-height: auto !important;
     height: auto !important;
     overflow: visible !important;
+    background: white !important;
   }
 
-  /* ✅ CRITICAL: your "avoid" rules can cause clipping if a section is taller than 1 page */
-  .pdf-section,
-  .pdf-finding,
-  .pdf-photo-item {
+  /* Allow sections to break naturally */
+  .pdf-section {
     page-break-inside: auto !important;
     break-inside: auto !important;
   }
 
-  /* ✅ Let the photo grid paginate naturally */
   .pdf-photo-grid {
     break-inside: auto !important;
+  }
+
+  /* Keep small items together when possible */
+  .pdf-photo-item,
+  .pdf-finding {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Better image quality for print */
