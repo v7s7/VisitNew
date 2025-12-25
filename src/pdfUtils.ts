@@ -1,4 +1,3 @@
-// src/pdfUtils.ts
 import { PropertyReport } from './types';
 
 export function sanitizeFilename(filename: string): string {
@@ -35,15 +34,21 @@ export function generatePdfFilename(report: PropertyReport): string {
     ? getBahrainDateString(new Date(report.submittedAt))
     : getBahrainDateString();
 
-  const code = sanitizeFilename(report.propertyCode || 'Report');
-  const name = sanitizeFilename(report.propertyName || 'Property');
-  return `${code} - ${name} - ${dateStr}.pdf`;
+  const code = sanitizeFilename(report.propertyCode || '');
+  const name = sanitizeFilename(report.propertyName || '');
+
+  // ✅ Property is optional now
+  if (code && name) return `${code} - ${name} - ${dateStr}.pdf`;
+  if (code) return `${code} - ${dateStr}.pdf`;
+  if (name) return `${name} - ${dateStr}.pdf`;
+  return `Report - ${dateStr}.pdf`;
 }
 
+/**
+ * ✅ Property selection is NOT required anymore.
+ * Only validate what you truly want required for printing/exports.
+ */
 export function validateReportForPdf(report: PropertyReport): string | null {
-  if (!report?.propertyCode?.trim() || !report?.propertyName?.trim()) {
-    return 'يرجى اختيار العقار | Please select a property';
-  }
   if (!report?.visitType?.trim()) {
     return 'يرجى تحديد نوع الزيارة | Please specify visit type';
   }

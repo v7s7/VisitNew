@@ -219,7 +219,6 @@ export default function PropertyReportForm() {
   };
 
   const validateForExport = (): string | null => {
-    if (!selectedProperty) return 'يرجى اختيار العقار | Please select a property';
     if (!formData.visitType.trim()) return 'يرجى تحديد نوع الزيارة | Please specify visit type';
 
     if (formData.visitType === 'complaint' && !formData.complaint.trim()) {
@@ -229,42 +228,42 @@ export default function PropertyReportForm() {
     return null;
   };
 
-  const buildCurrentReport = (): PropertyReport | null => {
-    if (!selectedProperty) return null;
+const buildCurrentReport = (): PropertyReport | null => {
+  // ✅ allow generating report even without selecting a property
+  return {
+    propertyId: selectedProperty?.id || '',
+    propertyCode: selectedProperty?.code || '',
+    propertyName: selectedProperty?.name || '',
 
-    return {
-      propertyId: selectedProperty.id,
-      propertyCode: selectedProperty.code,
-      propertyName: selectedProperty.name,
+    waqfType: formData.waqfType,
+    propertyType: formData.propertyType,
+    endowedTo: formData.endowedTo,
+    building: formData.building,
+    unitNumber: formData.unitNumber,
+    road: formData.road,
+    area: formData.area,
+    governorate: formData.governorate,
+    block: formData.block,
 
-      waqfType: formData.waqfType,
-      propertyType: formData.propertyType,
-      endowedTo: formData.endowedTo,
-      building: formData.building,
-      unitNumber: formData.unitNumber,
-      road: formData.road,
-      area: formData.area,
-      governorate: formData.governorate,
-      block: formData.block,
+    locationDescription: formData.locationDescription,
+    locationLink: formData.locationLink,
 
-      locationDescription: formData.locationDescription,
-      locationLink: formData.locationLink,
+    mainPhotos,
+    floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
+    flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+    additionalNotes: formData.additionalNotes || undefined,
 
-      mainPhotos,
-      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
-      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
-      additionalNotes: formData.additionalNotes || undefined,
+    visitType: formData.visitType,
+    complaint: formData.complaint,
+    complaintFiles,
 
-      visitType: formData.visitType,
-      complaint: formData.complaint,
-      complaintFiles,
+    findings,
+    actions,
 
-      findings,
-      actions,
-
-      corrector: formData.corrector || undefined,
-    };
+    corrector: formData.corrector || undefined,
   };
+};
+
 
   useEffect(() => {
     if (!printQueued) return;
