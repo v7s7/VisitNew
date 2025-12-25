@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
-import { validateReportForPdf, formatBahrainDate, printReport } from '../pdfUtils';
+import { validateReportForPdf } from '../pdfUtils';
 import { downloadReportZip } from '../zipUtils';
 
 import PropertySearch from './PropertySearch';
@@ -39,6 +39,51 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
   );
 }
 
+function formatBahrainDate(date = new Date()) {
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Bahrain',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  };
+  return new Intl.DateTimeFormat('en-GB', options).format(date);
+}
+
+async function waitForPrintAssets(root: HTMLElement, timeoutMs = 6000) {
+  const start = Date.now();
+
+  try {
+    // @ts-ignore
+    if (document.fonts?.ready) {
+      // @ts-ignore
+      await Promise.race([
+        // @ts-ignore
+        document.fonts.ready,
+        new Promise((r) => setTimeout(r, Math.max(0, timeoutMs - (Date.now() - start)))),
+      ]);
+    }
+  } catch {
+    // ignore
+  }
+
+  const imgs = Array.from(root.querySelectorAll('img')).filter((img) => !img.complete);
+  if (!imgs.length) return;
+
+  await Promise.race([
+    Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          })
+      )
+    ),
+    new Promise((r) => setTimeout(r, Math.max(0, timeoutMs - (Date.now() - start)))),
+  ]);
+}
+
 export default function PropertyReportForm() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
@@ -73,6 +118,52 @@ export default function PropertyReportForm() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
   const isMobile = useMemo(() => isProbablyMobile(), []);
+  const pdfContentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleId = 'visitprop-print-style';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+@media print {
+  body.visitprop-printing { background: #fff !important; }
+
+  body.visitprop-printing * {
+    visibility: hidden !important;
+  }
+
+  body.visitprop-printing #pdf-content,
+  body.visitprop-printing #pdf-content * {
+    visibility: visible !important;
+  }
+
+  body.visitprop-printing #pdf-content {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}
+    `.trim();
+
+    document.head.appendChild(style);
+    return () => {
+      style.remove();
+    };
+  }, []);
 
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
@@ -134,8 +225,6 @@ export default function PropertyReportForm() {
     if (formData.visitType === 'complaint' && !formData.complaint.trim()) {
       return 'يرجى كتابة تفاصيل البلاغ | Please enter complaint details';
     }
-
-
 
     return null;
   };
@@ -213,9 +302,32 @@ export default function PropertyReportForm() {
         }
 
         setPdfError(null);
-        await printReport(currentReport);
+
+        const pdfRoot =
+          pdfContentRef.current || (document.getElementById('pdf-content') as HTMLDivElement | null);
+        if (!pdfRoot) {
+          setPdfError('PDF content not found (pdf-content).');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        await waitForPrintAssets(pdfRoot);
+
+        document.body.classList.add('visitprop-printing');
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+        const cleanup = () => document.body.classList.remove('visitprop-printing');
+        window.addEventListener('afterprint', cleanup, { once: true });
+
+        window.print();
+
+        // fallback cleanup for browsers that don't fire afterprint reliably
+        setTimeout(() => {
+          document.body.classList.remove('visitprop-printing');
+        }, 300);
       } catch (error: any) {
         console.error('Print error:', error);
+        document.body.classList.remove('visitprop-printing');
         setPdfError(
           error.message ||
             'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
@@ -598,9 +710,20 @@ export default function PropertyReportForm() {
         )}
       </form>
 
-      {/* Keep the PDF DOM mounted, but hidden off-screen (no UI impact) */}
+      {/* This is the exact element you asked about */}
       {currentReportForPdf && (
-        <div id="pdf-content" className="pdf-content-hidden" aria-hidden="true">
+        <div
+          id="pdf-content"
+          ref={pdfContentRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: -100000,
+            top: 0,
+            width: '210mm',
+            background: '#fff',
+          }}
+        >
           <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
         </div>
       )}
