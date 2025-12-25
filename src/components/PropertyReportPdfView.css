@@ -216,9 +216,18 @@
     margin: 15mm 12mm;
   }
 
+  /* ✅ CRITICAL: allow pagination (prevents "only first page printed") */
+  html,
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .pdf-report {
@@ -227,16 +236,24 @@
     padding: 0;
     margin: 0;
     box-shadow: none;
+
+    /* ✅ CRITICAL: prevents extra blank page + prevents clipping */
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Ensure proper page breaks */
-  .pdf-section {
-    page-break-inside: avoid;
+  /* ✅ CRITICAL: your "avoid" rules can cause clipping if a section is taller than 1 page */
+  .pdf-section,
+  .pdf-finding,
+  .pdf-photo-item {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
-  .pdf-photo-item,
-  .pdf-finding {
-    page-break-inside: avoid;
+  /* ✅ Let the photo grid paginate naturally */
+  .pdf-photo-grid {
+    break-inside: auto !important;
   }
 
   /* Better image quality for print */
