@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
-import { printReport, formatBahrainDate } from '../pdfUtils';
+import { validateReportForPdf, formatBahrainDate } from '../pdfUtils';
 import { downloadReportZip } from '../zipUtils';
 
 import PropertySearch from './PropertySearch';
@@ -39,6 +39,42 @@ function hasMeaningfulReportData(report: PropertyReport): boolean {
   );
 }
 
+async function waitForPrintAssets(timeoutMs = 3000) {
+  const start = Date.now();
+
+  try {
+    // @ts-ignore
+    if (document.fonts?.ready) {
+      // @ts-ignore
+      await Promise.race([
+        // @ts-ignore
+        document.fonts.ready,
+        new Promise((r) => setTimeout(r, Math.max(0, timeoutMs - (Date.now() - start)))),
+      ]);
+    }
+  } catch {}
+
+  const pdfContent = document.getElementById('pdf-content');
+  if (!pdfContent) return;
+
+  const imgs = Array.from(pdfContent.querySelectorAll('img')).filter((img) => !img.complete);
+  if (!imgs.length) return;
+
+  await Promise.race([
+    Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          })
+      )
+    ),
+    new Promise((r) => setTimeout(r, Math.max(0, timeoutMs - (Date.now() - start)))),
+  ]);
+}
+
 export default function PropertyReportForm() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
@@ -69,10 +105,92 @@ export default function PropertyReportForm() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [zipError, setZipError] = useState<string | null>(null);
 
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [printQueued, setPrintQueued] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
   const isMobile = useMemo(() => isProbablyMobile(), []);
+
+  // Inject print styles once on mount
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const styleId = 'visitprop-print-style';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide everything except PDF content */
+  body > *:not(#pdf-content) {
+    display: none !important;
+  }
+
+  /* Show and position PDF content */
+  #pdf-content {
+    display: block !important;
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* Allow natural page breaks */
+  .pdf-report {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    page-break-after: auto !important;
+  }
+
+  /* Allow sections to break across pages */
+  .pdf-section {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  /* Keep small items together when possible */
+  .pdf-photo-item,
+  .pdf-finding {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .pdf-photo-grid {
+    break-inside: auto !important;
+  }
+}
+    `.trim();
+
+    document.head.appendChild(style);
+    return () => {
+      style.remove();
+    };
+  }, []);
 
   const handlePropertySelect = (property: Property | null) => {
     setSelectedProperty(property);
@@ -119,7 +237,7 @@ export default function PropertyReportForm() {
     setActions([]);
     setPdfError(null);
     setZipError(null);
-    setIsPrinting(false);
+    setPrintQueued(false);
     setIsDownloadingZip(false);
   };
 
@@ -172,42 +290,69 @@ export default function PropertyReportForm() {
     };
   };
 
+  // Handle print queue
+  useEffect(() => {
+    if (!printQueued) return;
+
+    const executePrint = async () => {
+      const currentReport = buildCurrentReport();
+      if (!currentReport) {
+        setPrintQueued(false);
+        return;
+      }
+
+      try {
+        // Validate
+        const baseValidation = validateForExport();
+        if (baseValidation) {
+          setPdfError(baseValidation);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        if (!hasMeaningfulReportData(currentReport)) {
+          setPdfError('اكتب أي بيانات أو أضف ملفات قبل الطباعة | Add some info or files before printing');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        const validationError = validateReportForPdf(currentReport);
+        if (validationError) {
+          setPdfError(validationError);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        setPdfError(null);
+
+        // Wait for images to load
+        await waitForPrintAssets();
+
+        // Small delay to ensure render is complete
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+
+        // Open print dialog
+        window.print();
+      } catch (error: any) {
+        console.error('Print error:', error);
+        setPdfError(
+          error.message ||
+            'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
+        );
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } finally {
+        setPrintQueued(false);
+      }
+    };
+
+    executePrint();
+  }, [printQueued]);
+
   const handlePrint = async () => {
     setPdfError(null);
-    setIsPrinting(true);
-
-    const currentReport = buildCurrentReport();
-    if (!currentReport) {
-      setIsPrinting(false);
-      return;
-    }
-
-    try {
-      const baseValidation = validateForExport();
-      if (baseValidation) {
-        setPdfError(baseValidation);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-
-      if (!hasMeaningfulReportData(currentReport)) {
-        setPdfError('اكتب أي بيانات أو أضف ملفات قبل الطباعة | Add some info or files before printing');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-
-      // Use the printReport function from pdfUtils (opens new window with clean HTML)
-      await printReport(currentReport);
-    } catch (error: any) {
-      console.error('Print error:', error);
-      setPdfError(
-        error.message ||
-          'فشل فتح نافذة الطباعة. حاول مرة أخرى. | Failed to open print dialog. Try again.'
-      );
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } finally {
-      setIsPrinting(false);
-    }
+    setPrintQueued(true);
   };
 
   const handleDownloadZip = async () => {
@@ -231,6 +376,17 @@ export default function PropertyReportForm() {
     setZipError(null);
 
     try {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+
+      const pdfValidationError = validateReportForPdf(currentReport);
+      if (pdfValidationError) {
+        setZipError(pdfValidationError);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       await downloadReportZip(currentReport);
     } catch (error: any) {
       console.error('ZIP download error:', error);
@@ -242,7 +398,7 @@ export default function PropertyReportForm() {
   };
 
   const isFormDisabled = !selectedProperty;
-  const isPrintButtonDisabled = !selectedProperty || isPrinting;
+  const isPrintButtonDisabled = !selectedProperty || printQueued;
   const isZipButtonDisabled = !selectedProperty || isDownloadingZip;
 
   const currentReportForPdf = buildCurrentReport();
@@ -250,336 +406,336 @@ export default function PropertyReportForm() {
   return (
     <>
       <form onSubmit={(e) => e.preventDefault()} className="property-report-form">
-      <div className="form-header">
-        <h1 className="form-title">تقرير العقار</h1>
-        <p className="form-subtitle">Property Inspection Report</p>
-      </div>
-
-      {pdfError && (
-        <div className="alert alert-error" role="alert">
-          {pdfError}
+        <div className="form-header">
+          <h1 className="form-title">تقرير العقار</h1>
+          <p className="form-subtitle">Property Inspection Report</p>
         </div>
-      )}
 
-      {zipError && (
-        <div className="alert alert-error" role="alert">
-          {zipError}
-        </div>
-      )}
-
-      <PropertySearch onPropertySelect={handlePropertySelect} selectedProperty={selectedProperty} />
-
-      {isFormDisabled && (
-        <div className="form-disabled-message">
-          يرجى اختيار العقار أولاً لإكمال التقرير
-          <br />
-          Please select a property first to complete the report
-        </div>
-      )}
-
-      {selectedProperty && (
-        <>
-          <div className="section">
-            <h3 className="section-title">بيانات العقار | Property Details</h3>
-
-            <div className="field-group">
-              <label htmlFor="waqfType">نوع الوقف | Waqf Type</label>
-              <input
-                type="text"
-                id="waqfType"
-                value={formData.waqfType}
-                onChange={(e) => handleInputChange('waqfType', e.target.value)}
-                placeholder="أدخل نوع الوقف"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="propertyType">نوع العقار | Property Type</label>
-              <input
-                type="text"
-                id="propertyType"
-                value={formData.propertyType}
-                onChange={(e) => handleInputChange('propertyType', e.target.value)}
-                placeholder="أدخل نوع العقار"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="endowedTo">موقوف على | Endowed To</label>
-              <input
-                type="text"
-                id="endowedTo"
-                value={formData.endowedTo}
-                onChange={(e) => handleInputChange('endowedTo', e.target.value)}
-                placeholder="أدخل موقوف على"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="building">مبنى | Building</label>
-              <input
-                type="text"
-                id="building"
-                value={formData.building}
-                onChange={(e) => handleInputChange('building', e.target.value)}
-                placeholder="أدخل المبنى"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="unitNumber">رقم الوحدة | Unit Number</label>
-              <input
-                type="text"
-                id="unitNumber"
-                value={formData.unitNumber}
-                onChange={(e) => handleInputChange('unitNumber', e.target.value)}
-                placeholder="أدخل رقم الوحدة"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="road">طريق / شارع | Road / Street</label>
-              <input
-                type="text"
-                id="road"
-                value={formData.road}
-                onChange={(e) => handleInputChange('road', e.target.value)}
-                placeholder="أدخل الطريق / الشارع"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="area">المنطقة | Area</label>
-              <input
-                type="text"
-                id="area"
-                value={formData.area}
-                onChange={(e) => handleInputChange('area', e.target.value)}
-                placeholder="أدخل المنطقة"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="governorate">المحافظة | Governorate</label>
-              <input
-                type="text"
-                id="governorate"
-                value={formData.governorate}
-                onChange={(e) => handleInputChange('governorate', e.target.value)}
-                placeholder="أدخل المحافظة"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="block">مجمع | Complex</label>
-              <input
-                type="text"
-                id="block"
-                value={formData.block}
-                onChange={(e) => handleInputChange('block', e.target.value)}
-                placeholder="أدخل المجمع"
-              />
-            </div>
+        {pdfError && (
+          <div className="alert alert-error" role="alert">
+            {pdfError}
           </div>
+        )}
 
-          <div className="section">
-            <h3 className="section-title">الموقع | Location</h3>
-
-            <div className="field-group">
-              <label htmlFor="locationDescription">وصف الموقع | Location Description</label>
-              <textarea
-                id="locationDescription"
-                value={formData.locationDescription}
-                onChange={(e) => handleInputChange('locationDescription', e.target.value)}
-                placeholder="اكتب وصف الموقع..."
-                rows={3}
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="locationLink">رابط الموقع | Location Link (Google Maps)</label>
-              <input
-                type="url"
-                id="locationLink"
-                value={formData.locationLink}
-                onChange={(e) => handleInputChange('locationLink', e.target.value)}
-                placeholder="https://maps.google.com/..."
-              />
-            </div>
+        {zipError && (
+          <div className="alert alert-error" role="alert">
+            {zipError}
           </div>
+        )}
 
-          <div className="section">
-            <h3 className="section-title">الصور الرئيسية | Main Photos</h3>
-            <PhotoUpload photos={mainPhotos} onPhotosChange={setMainPhotos} />
+        <PropertySearch onPropertySelect={handlePropertySelect} selectedProperty={selectedProperty} />
+
+        {isFormDisabled && (
+          <div className="form-disabled-message">
+            يرجى اختيار العقار أولاً لإكمال التقرير
+            <br />
+            Please select a property first to complete the report
           </div>
+        )}
 
-          <div className="section">
-            <h3 className="section-title">تفاصيل المبنى (اختياري) | Building Details (Optional)</h3>
+        {selectedProperty && (
+          <>
+            <div className="section">
+              <h3 className="section-title">بيانات العقار | Property Details</h3>
 
-            <div className="field-group">
-              <label htmlFor="floorsCount">عدد الطوابق | No. of Floors</label>
-              <input
-                type="number"
-                id="floorsCount"
-                value={formData.floorsCount}
-                onChange={(e) => handleInputChange('floorsCount', e.target.value)}
-                placeholder="مثال: 5"
-                min="0"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="flatsCount">عدد الشقق | No. of Flats</label>
-              <input
-                type="number"
-                id="flatsCount"
-                value={formData.flatsCount}
-                onChange={(e) => handleInputChange('flatsCount', e.target.value)}
-                placeholder="مثال: 20"
-                min="0"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="additionalNotes">ملاحظات إضافية | Additional Notes</label>
-              <textarea
-                id="additionalNotes"
-                value={formData.additionalNotes}
-                onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
-                placeholder="أي ملاحظات إضافية عن المبنى..."
-                rows={4}
-              />
-            </div>
-          </div>
-
-          <div className="section">
-            <h3 className="section-title">معلومات الزيارة | Visit Information</h3>
-
-            <div className="field-group">
-              <label htmlFor="visitType">نوع الزيارة | Visit Type *</label>
-              <select
-                id="visitType"
-                value={formData.visitType}
-                onChange={(e) => handleInputChange('visitType', e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '16px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="">-- اختر نوع الزيارة | Select Visit Type --</option>
-                <option value="routine">زيارة دورية | Routine Visit</option>
-                <option value="complaint">بلاغ | Complaint</option>
-              </select>
-            </div>
-
-            {formData.visitType === 'complaint' && (
-              <>
-                <div className="field-group">
-                  <label htmlFor="complaint">تفاصيل البلاغ | Complaint Details *</label>
-                  <textarea
-                    id="complaint"
-                    value={formData.complaint}
-                    onChange={(e) => handleInputChange('complaint', e.target.value)}
-                    placeholder="اكتب تفاصيل البلاغ..."
-                    rows={4}
-                    required
-                  />
-                </div>
-
-                <div className="field-group">
-                  <label>ملفات البلاغ | Complaint Files (Optional)</label>
-                  <ComplaintFileUpload files={complaintFiles} onFilesChange={setComplaintFiles} />
-                </div>
-              </>
-            )}
-          </div>
-
-          <FindingsList findings={findings} onFindingsChange={setFindings} />
-          <ActionsList actions={actions} onActionsChange={setActions} />
-
-          <div className="section">
-            <h3 className="section-title">المصحح | Corrector (Optional)</h3>
-            <div className="field-group">
-              <label htmlFor="corrector">اسم المصحح | Corrector Name</label>
-              <input
-                type="text"
-                id="corrector"
-                value={formData.corrector}
-                onChange={(e) => handleInputChange('corrector', e.target.value)}
-                placeholder="أدخل اسم المصحح (اختياري)"
-              />
-            </div>
-          </div>
-
-          <div className="submit-section">
-            <button
-              type="button"
-              className="pdf-button"
-              onClick={handlePrint}
-              disabled={isPrintButtonDisabled}
-              title="طباعة أو حفظ كـ PDF | Print or Save as PDF"
-            >
-              {isPrinting ? (
-                <>
-                  <span className="loading"></span>
-                  <span>جاري التحضير...</span>
-                </>
-              ) : (
-                '🖨️ طباعة / Print'
-              )}
-            </button>
-
-            <button
-              type="button"
-              className="zip-button"
-              onClick={handleDownloadZip}
-              disabled={isZipButtonDisabled}
-              title="تحميل جميع الملفات | Download All Files"
-            >
-              {isDownloadingZip ? (
-                <>
-                  <span className="loading"></span>
-                  <span>جاري التحميل...</span>
-                </>
-              ) : (
-                '📦 تحميل ZIP / Download ZIP'
-              )}
-            </button>
-
-            {isMobile && (
-              <div style={{ fontSize: 12, opacity: 0.8, paddingTop: 6 }}>
-                Tip: Download ZIP to keep everything together (PDF + photos).
+              <div className="field-group">
+                <label htmlFor="waqfType">نوع الوقف | Waqf Type</label>
+                <input
+                  type="text"
+                  id="waqfType"
+                  value={formData.waqfType}
+                  onChange={(e) => handleInputChange('waqfType', e.target.value)}
+                  placeholder="أدخل نوع الوقف"
+                />
               </div>
-            )}
-          </div>
-        </>
-      )}
-    </form>
 
-    {/* Hidden PDF content - used by printReport() to clone and render in new window */}
-    {currentReportForPdf && (
-      <div
-        id="pdf-content"
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: -100000,
-          top: 0,
-          width: '210mm',
-          background: '#fff',
-          visibility: 'hidden',
-          pointerEvents: 'none',
-        }}
-      >
-        <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
-      </div>
-    )}
+              <div className="field-group">
+                <label htmlFor="propertyType">نوع العقار | Property Type</label>
+                <input
+                  type="text"
+                  id="propertyType"
+                  value={formData.propertyType}
+                  onChange={(e) => handleInputChange('propertyType', e.target.value)}
+                  placeholder="أدخل نوع العقار"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="endowedTo">موقوف على | Endowed To</label>
+                <input
+                  type="text"
+                  id="endowedTo"
+                  value={formData.endowedTo}
+                  onChange={(e) => handleInputChange('endowedTo', e.target.value)}
+                  placeholder="أدخل موقوف على"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="building">مبنى | Building</label>
+                <input
+                  type="text"
+                  id="building"
+                  value={formData.building}
+                  onChange={(e) => handleInputChange('building', e.target.value)}
+                  placeholder="أدخل المبنى"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="unitNumber">رقم الوحدة | Unit Number</label>
+                <input
+                  type="text"
+                  id="unitNumber"
+                  value={formData.unitNumber}
+                  onChange={(e) => handleInputChange('unitNumber', e.target.value)}
+                  placeholder="أدخل رقم الوحدة"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="road">طريق / شارع | Road / Street</label>
+                <input
+                  type="text"
+                  id="road"
+                  value={formData.road}
+                  onChange={(e) => handleInputChange('road', e.target.value)}
+                  placeholder="أدخل الطريق / الشارع"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="area">المنطقة | Area</label>
+                <input
+                  type="text"
+                  id="area"
+                  value={formData.area}
+                  onChange={(e) => handleInputChange('area', e.target.value)}
+                  placeholder="أدخل المنطقة"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="governorate">المحافظة | Governorate</label>
+                <input
+                  type="text"
+                  id="governorate"
+                  value={formData.governorate}
+                  onChange={(e) => handleInputChange('governorate', e.target.value)}
+                  placeholder="أدخل المحافظة"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="block">مجمع | Complex</label>
+                <input
+                  type="text"
+                  id="block"
+                  value={formData.block}
+                  onChange={(e) => handleInputChange('block', e.target.value)}
+                  placeholder="أدخل المجمع"
+                />
+              </div>
+            </div>
+
+            <div className="section">
+              <h3 className="section-title">الموقع | Location</h3>
+
+              <div className="field-group">
+                <label htmlFor="locationDescription">وصف الموقع | Location Description</label>
+                <textarea
+                  id="locationDescription"
+                  value={formData.locationDescription}
+                  onChange={(e) => handleInputChange('locationDescription', e.target.value)}
+                  placeholder="اكتب وصف الموقع..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="locationLink">رابط الموقع | Location Link (Google Maps)</label>
+                <input
+                  type="url"
+                  id="locationLink"
+                  value={formData.locationLink}
+                  onChange={(e) => handleInputChange('locationLink', e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                />
+              </div>
+            </div>
+
+            <div className="section">
+              <h3 className="section-title">الصور الرئيسية | Main Photos</h3>
+              <PhotoUpload photos={mainPhotos} onPhotosChange={setMainPhotos} />
+            </div>
+
+            <div className="section">
+              <h3 className="section-title">تفاصيل المبنى (اختياري) | Building Details (Optional)</h3>
+
+              <div className="field-group">
+                <label htmlFor="floorsCount">عدد الطوابق | No. of Floors</label>
+                <input
+                  type="number"
+                  id="floorsCount"
+                  value={formData.floorsCount}
+                  onChange={(e) => handleInputChange('floorsCount', e.target.value)}
+                  placeholder="مثال: 5"
+                  min="0"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="flatsCount">عدد الشقق | No. of Flats</label>
+                <input
+                  type="number"
+                  id="flatsCount"
+                  value={formData.flatsCount}
+                  onChange={(e) => handleInputChange('flatsCount', e.target.value)}
+                  placeholder="مثال: 20"
+                  min="0"
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="additionalNotes">ملاحظات إضافية | Additional Notes</label>
+                <textarea
+                  id="additionalNotes"
+                  value={formData.additionalNotes}
+                  onChange={(e) => handleInputChange('additionalNotes', e.target.value)}
+                  placeholder="أي ملاحظات إضافية عن المبنى..."
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <div className="section">
+              <h3 className="section-title">معلومات الزيارة | Visit Information</h3>
+
+              <div className="field-group">
+                <label htmlFor="visitType">نوع الزيارة | Visit Type *</label>
+                <select
+                  id="visitType"
+                  value={formData.visitType}
+                  onChange={(e) => handleInputChange('visitType', e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '16px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">-- اختر نوع الزيارة | Select Visit Type --</option>
+                  <option value="routine">زيارة دورية | Routine Visit</option>
+                  <option value="complaint">بلاغ | Complaint</option>
+                </select>
+              </div>
+
+              {formData.visitType === 'complaint' && (
+                <>
+                  <div className="field-group">
+                    <label htmlFor="complaint">تفاصيل البلاغ | Complaint Details *</label>
+                    <textarea
+                      id="complaint"
+                      value={formData.complaint}
+                      onChange={(e) => handleInputChange('complaint', e.target.value)}
+                      placeholder="اكتب تفاصيل البلاغ..."
+                      rows={4}
+                      required
+                    />
+                  </div>
+
+                  <div className="field-group">
+                    <label>ملفات البلاغ | Complaint Files (Optional)</label>
+                    <ComplaintFileUpload files={complaintFiles} onFilesChange={setComplaintFiles} />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <FindingsList findings={findings} onFindingsChange={setFindings} />
+            <ActionsList actions={actions} onActionsChange={setActions} />
+
+            <div className="section">
+              <h3 className="section-title">المصحح | Corrector (Optional)</h3>
+              <div className="field-group">
+                <label htmlFor="corrector">اسم المصحح | Corrector Name</label>
+                <input
+                  type="text"
+                  id="corrector"
+                  value={formData.corrector}
+                  onChange={(e) => handleInputChange('corrector', e.target.value)}
+                  placeholder="أدخل اسم المصحح (اختياري)"
+                />
+              </div>
+            </div>
+
+            <div className="submit-section">
+              <button
+                type="button"
+                className="pdf-button"
+                onClick={handlePrint}
+                disabled={isPrintButtonDisabled}
+                title="طباعة أو حفظ كـ PDF | Print or Save as PDF"
+              >
+                {printQueued ? (
+                  <>
+                    <span className="loading"></span>
+                    <span>جاري التحضير...</span>
+                  </>
+                ) : (
+                  '🖨️ طباعة / Print'
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="zip-button"
+                onClick={handleDownloadZip}
+                disabled={isZipButtonDisabled}
+                title="تحميل جميع الملفات | Download All Files"
+              >
+                {isDownloadingZip ? (
+                  <>
+                    <span className="loading"></span>
+                    <span>جاري التحميل...</span>
+                  </>
+                ) : (
+                  '📦 تحميل ZIP / Download ZIP'
+                )}
+              </button>
+
+              {isMobile && (
+                <div style={{ fontSize: 12, opacity: 0.8, paddingTop: 6 }}>
+                  Tip: Download ZIP to keep everything together (PDF + photos).
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </form>
+
+      {/* Hidden PDF content - only visible during print */}
+      {currentReportForPdf && (
+        <div
+          id="pdf-content"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: -100000,
+            top: 0,
+            width: '210mm',
+            background: '#fff',
+            visibility: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
+        </div>
+      )}
     </>
   );
 }

@@ -252,3 +252,15 @@ label:has(+ textarea[required])::after {
     font-size: var(--text-base);
   }
 }
+/* Allow sections to break across pages */
+.pdf-section {
+  page-break-inside: auto !important;
+  break-inside: auto !important;
+}
+
+/* Allow natural page breaks */
+.pdf-report {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
