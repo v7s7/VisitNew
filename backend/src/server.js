@@ -13,15 +13,12 @@ app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 8080;
 
-// CORS
-// Allows:
-// - localhost
-// - your main Vercel domain
-// - ANY Vercel preview domain (*.vercel.app) so ZIP/Print won’t break on new deployments
+// CORS - Allow Vercel preview deployments
 const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'https://visit-prop-6i8s.vercel.app',
+  'https://visit-prop.vercel.app'
 ];
 
 const envOrigins = [
@@ -57,9 +54,9 @@ app.use(
   })
 );
 
-// Middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Middleware - Increased limits for large file uploads
+app.use(express.json({ limit: '100mb' })); // Increased from 50mb
+app.use(express.urlencoded({ extended: true, limit: '100mb' })); // Increased from 50mb
 
 // Request logging
 app.use((req, res, next) => {
@@ -92,8 +89,8 @@ app.use((err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'File too large',
-        message: 'Maximum file size is 10MB',
-        details: `The uploaded file exceeds the 10MB size limit`,
+        message: 'Maximum file size is 50MB',
+        details: `The uploaded file exceeds the 50MB size limit`,
         code: 'LIMIT_FILE_SIZE',
       });
     } else if (err.code === 'LIMIT_FILE_COUNT') {
@@ -123,7 +120,8 @@ app.use((err, req, res, next) => {
   // Handle file filter errors (file type validation)
   if (
     err.message?.includes('Only image files are allowed') ||
-    err.message?.includes('Only images, PDFs, Word documents')
+    err.message?.includes('Only images, PDFs, Word documents') ||
+    err.message?.includes('Unsupported file type')
   ) {
     return res.status(400).json({
       error: 'Invalid file type',
@@ -160,10 +158,10 @@ async function startServer() {
       console.log('');
       console.log('🚀 ========================================');
       console.log('✅ VisitProp Backend Server is running!');
-      console.log(`📍 URL: http://localhost:${PORT}`);
+      console.log(`🌐 URL: http://localhost:${PORT}`);
       console.log('========================================');
       console.log('');
-      console.log('📝 API Endpoints:');
+      console.log('📋 API Endpoints:');
       console.log(`   GET  http://localhost:${PORT}/api/health`);
       console.log(`   GET  http://localhost:${PORT}/api/properties?search=<query>`);
       console.log(`   POST http://localhost:${PORT}/api/upload`);
@@ -171,9 +169,14 @@ async function startServer() {
       console.log(`   GET  http://localhost:${PORT}/api/reports`);
       console.log(`   POST http://localhost:${PORT}/api/bundle`);
       console.log('');
-      console.log('🌐 CORS Allowed Origins:');
+      console.log('🌍 CORS Allowed Origins:');
       allowedOrigins.forEach((o) => console.log(`   ✅ ${o}`));
       console.log('   ✅ *.vercel.app (preview deployments)');
+      console.log('');
+      console.log('📦 File Upload Limits:');
+      console.log('   ✅ Max file size: 50MB');
+      console.log('   ✅ Max body size: 100MB');
+      console.log('   ✅ Allowed: Images, PDF, Word, Excel, CSV, Text');
       console.log('');
       console.log('✨ Ready to accept requests!');
       console.log('');

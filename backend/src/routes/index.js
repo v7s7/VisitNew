@@ -12,7 +12,7 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit (increased from 10MB)
   },
   fileFilter: (req, file, cb) => {
     const allowedImageTypes = [
@@ -23,6 +23,7 @@ const upload = multer({
       'image/webp',
       'image/bmp',
     ];
+    
     const allowedDocTypes = [
       'application/pdf',
       'application/msword',
@@ -30,6 +31,8 @@ const upload = multer({
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/plain',
+      'text/csv', // ✅ Added CSV support
+      'application/csv', // ✅ Alternative CSV mime type
     ];
 
     const isImage = allowedImageTypes.includes(file.mimetype) || file.mimetype.startsWith('image/');
@@ -38,20 +41,20 @@ const upload = multer({
     const subfolder = req.body.subfolder;
 
     console.log(
-      `   🔍 File filter check: ${file.originalname} (${file.mimetype}), subfolder: ${subfolder || 'undefined'}`
+      `   📄 File filter check: ${file.originalname} (${file.mimetype}), subfolder: ${subfolder || 'undefined'}`
     );
 
     // For /api/bundle we accept whatever passed here and validate later if needed.
     // It won't send "subfolder" the same way as /api/upload.
     if (!subfolder) {
       if (isImage || isDocument) {
-        console.log(`   ✓ Accepted (subfolder not available, will validate in controller)`);
+        console.log(`   ✅ Accepted (subfolder not available, will validate in controller)`);
         cb(null, true);
       } else {
-        console.log(`   ✗ Rejected: unsupported file type`);
+        console.log(`   ❌ Rejected: unsupported file type`);
         cb(
           new Error(
-            `Unsupported file type: ${file.mimetype}. Allowed: images, PDFs, Word, Excel, text files`
+            `Unsupported file type: ${file.mimetype}. Allowed: images, PDFs, Word, Excel, CSV, text files`
           ),
           false
         );
@@ -61,23 +64,23 @@ const upload = multer({
 
     if (subfolder === 'ملفات البلاغ') {
       if (isImage || isDocument) {
-        console.log(`   ✓ Accepted for ${subfolder}`);
+        console.log(`   ✅ Accepted for ${subfolder}`);
         cb(null, true);
       } else {
-        console.log(`   ✗ Rejected: only images and documents allowed for ${subfolder}`);
+        console.log(`   ❌ Rejected: only images and documents allowed for ${subfolder}`);
         cb(
           new Error(
-            'Only images, PDFs, Word documents, Excel files, and text files are allowed for Report Files'
+            'Only images, PDFs, Word documents, Excel files, CSV files, and text files are allowed for Report Files'
           ),
           false
         );
       }
     } else {
       if (isImage) {
-        console.log(`   ✓ Accepted for ${subfolder}`);
+        console.log(`   ✅ Accepted for ${subfolder}`);
         cb(null, true);
       } else {
-        console.log(`   ✗ Rejected: only images allowed for ${subfolder}`);
+        console.log(`   ❌ Rejected: only images allowed for ${subfolder}`);
         cb(new Error(`Only image files are allowed for ${subfolder || 'photo folders'}`), false);
       }
     }
