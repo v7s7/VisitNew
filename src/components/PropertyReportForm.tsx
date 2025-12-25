@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Property, PropertyReport, Finding, Action, UploadedPhoto, ComplaintFile } from '../types';
-import { printReport } from '../pdfUtils';
+import { printReport, formatBahrainDate } from '../pdfUtils';
 import { downloadReportZip } from '../zipUtils';
 
 import PropertySearch from './PropertySearch';
@@ -8,6 +8,7 @@ import PhotoUpload from './PhotoUpload';
 import ComplaintFileUpload from './ComplaintFileUpload';
 import FindingsList from './FindingsList';
 import ActionsList from './ActionsList';
+import PropertyReportPdfView from './PropertyReportPdfView';
 import './PropertyReportForm.css';
 
 function isProbablyMobile() {
@@ -244,8 +245,11 @@ export default function PropertyReportForm() {
   const isPrintButtonDisabled = !selectedProperty || isPrinting;
   const isZipButtonDisabled = !selectedProperty || isDownloadingZip;
 
+  const currentReportForPdf = buildCurrentReport();
+
   return (
-    <form onSubmit={(e) => e.preventDefault()} className="property-report-form">
+    <>
+      <form onSubmit={(e) => e.preventDefault()} className="property-report-form">
       <div className="form-header">
         <h1 className="form-title">تقرير العقار</h1>
         <p className="form-subtitle">Property Inspection Report</p>
@@ -557,5 +561,25 @@ export default function PropertyReportForm() {
         </>
       )}
     </form>
+
+    {/* Hidden PDF content - used by printReport() to clone and render in new window */}
+    {currentReportForPdf && (
+      <div
+        id="pdf-content"
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: -100000,
+          top: 0,
+          width: '210mm',
+          background: '#fff',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+        }}
+      >
+        <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
+      </div>
+    )}
+    </>
   );
 }
