@@ -724,13 +724,15 @@ export default function PropertyReportForm() {
           id="pdf-content"
           aria-hidden="true"
           style={{
-            position: 'absolute',
-            left: -100000,
+            position: 'fixed',
+            left: 0,
             top: 0,
             width: '210mm',
             background: '#fff',
-            visibility: 'hidden',
+            opacity: 0,
             pointerEvents: 'none',
+            zIndex: -9999,
+            overflow: 'visible',
           }}
         >
           <PropertyReportPdfView report={currentReportForPdf} generatedDate={formatBahrainDate()} />
