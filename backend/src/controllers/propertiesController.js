@@ -33,6 +33,30 @@ export async function searchPropertiesHandler(req, res) {
 }
 
 /**
+ * Add a new property
+ * POST /api/properties
+ */
+export async function addPropertyHandler(req, res) {
+  try {
+    const property = await propertiesService.addProperty(req.body || {});
+
+    console.log(`➕ New property added: code=${property.code} name=${property.name}`);
+
+    return res.status(201).json({
+      success: true,
+      property,
+      message: 'Property added successfully',
+    });
+  } catch (error) {
+    console.error('Add property error:', error);
+    return res.status(500).json({
+      error: 'Failed to add property',
+      message: error?.message || 'Unknown error',
+    });
+  }
+}
+
+/**
  * Get property by ID
  * GET /api/properties/:id
  */

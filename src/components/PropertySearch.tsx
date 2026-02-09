@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Property } from '../types';
 import { searchProperties } from '../api';
 import { debounce } from '../utils';
+import AddPropertyModal from './AddPropertyModal';
 import './PropertySearch.css';
 
 interface PropertySearchProps {
@@ -15,6 +16,7 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Debounced search function
   useEffect(() => {
@@ -55,6 +57,13 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
     setSearchQuery('');
     setSearchResults([]);
     setShowResults(false);
+  };
+
+  const handlePropertyAdded = (property: Property) => {
+    onPropertySelect(property);
+    setSearchQuery('');
+    setShowResults(false);
+    setSearchResults([]);
   };
 
   return (
@@ -117,8 +126,22 @@ export default function PropertySearch({ onPropertySelect, selectedProperty }: P
           {showResults && searchResults.length === 0 && !isSearching && (
             <div className="no-results">لا توجد نتائج | No results found</div>
           )}
+
+          <button
+            type="button"
+            className="add-property-btn"
+            onClick={() => setShowAddModal(true)}
+          >
+            + إضافة عقار جديد | Add New Property
+          </button>
         </>
       )}
+
+      <AddPropertyModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onPropertyAdded={handlePropertyAdded}
+      />
     </div>
   );
 }

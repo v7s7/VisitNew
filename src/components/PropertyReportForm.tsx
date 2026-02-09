@@ -533,24 +533,22 @@ export default function PropertyReportForm() {
               <div className="field-group">
                 <label htmlFor="floorsCount">عدد الطوابق | No. of Floors</label>
                 <input
-                  type="number"
+                  type="text"
                   id="floorsCount"
                   value={formData.floorsCount}
                   onChange={(e) => handleInputChange('floorsCount', e.target.value)}
                   placeholder="مثال: 5"
-                  min="0"
                 />
               </div>
 
               <div className="field-group">
                 <label htmlFor="flatsCount">عدد الشقق | No. of Flats</label>
                 <input
-                  type="number"
+                  type="text"
                   id="flatsCount"
                   value={formData.flatsCount}
                   onChange={(e) => handleInputChange('flatsCount', e.target.value)}
                   placeholder="مثال: 20"
-                  min="0"
                 />
               </div>
 

@@ -121,3 +121,85 @@ export async function getPropertyByCode(code) {
   const target = s(code);
   return allProperties.find((p) => p.code === target);
 }
+
+/**
+ * Add a new property to the Google Sheet
+ * All fields are optional except a generated id and code
+ */
+export async function addProperty(data) {
+  const spreadsheetId = s(process.env.GOOGLE_SHEETS_PROPERTIES_ID);
+  const sheetName = s(process.env.PROPERTIES_SHEET_NAME) || 'Properties';
+
+  if (!spreadsheetId) {
+    throw new Error('Missing GOOGLE_SHEETS_PROPERTIES_ID');
+  }
+
+  try {
+    const sheets = await getSheetsClient();
+
+    // Generate a unique id and code
+    const allProperties = await getAllProperties();
+    const maxId = allProperties.reduce((max, p) => {
+      const num = parseInt(p.id, 10);
+      return isNaN(num) ? max : Math.max(max, num);
+    }, 0);
+    const newId = String(maxId + 1);
+
+    const maxCode = allProperties.reduce((max, p) => {
+      const num = parseInt(p.code, 10);
+      return isNaN(num) ? max : Math.max(max, num);
+    }, 0);
+    const newCode = String(maxCode + 1);
+
+    // Build the row: A=id, B=code, C=name, D=waqfType, E=propertyType, F=endowedTo,
+    // G=building, H=unitNumber, I=road, J=area, K=governorate, L=block, M=defaultLocationLink, N=postcode
+    const newRow = [
+      newId,
+      newCode,
+      s(data.name) || `عقار ${newCode}`,
+      s(data.waqfType),
+      s(data.propertyType),
+      s(data.endowedTo),
+      s(data.building),
+      s(data.unitNumber),
+      s(data.road),
+      s(data.area),
+      s(data.governorate),
+      s(data.block),
+      s(data.defaultLocationLink),
+      s(data.postcode),
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!A:N`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [newRow],
+      },
+    });
+
+    console.log(`[Sheets] New property added: id=${newId} code=${newCode}`);
+
+    return {
+      id: newId,
+      code: newCode,
+      name: newRow[2],
+      waqfType: s(data.waqfType),
+      propertyType: s(data.propertyType),
+      endowedTo: s(data.endowedTo),
+      building: s(data.building),
+      unitNumber: s(data.unitNumber),
+      road: s(data.road),
+      area: s(data.area),
+      governorate: s(data.governorate),
+      block: s(data.block),
+      defaultLocationLink: s(data.defaultLocationLink),
+      postcode: s(data.postcode),
+    };
+  } catch (error) {
+    console.error('Error adding property to Google Sheet:', error?.message || error);
+    throw new Error(`Failed to add property to database: ${error?.message || error}`);
+  }
+}
