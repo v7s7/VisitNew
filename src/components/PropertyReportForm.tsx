@@ -233,8 +233,8 @@ export default function PropertyReportForm() {
       locationLink: formData.locationLink,
 
       mainPhotos,
-      floorsCount: formData.floorsCount ? parseInt(formData.floorsCount) : undefined,
-      flatsCount: formData.flatsCount ? parseInt(formData.flatsCount) : undefined,
+      floorsCount: formData.floorsCount || undefined,
+      flatsCount: formData.flatsCount || undefined,
       additionalNotes: formData.additionalNotes || undefined,
 
       visitType: formData.visitType,
