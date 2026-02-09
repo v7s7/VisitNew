@@ -228,8 +228,8 @@ export async function getAllReports() {
       actions: safeJsonParse(row[26], []),
       corrector: row[27] || '',
       inspectorName: row[28] || '',
-      floorsCount: parseOptionalInt(row[29]),
-      flatsCount: parseOptionalInt(row[30]),
+      floorsCount: (row[29] || '').trim() || undefined,
+      flatsCount: (row[30] || '').trim() || undefined,
       additionalNotes: row[31] || '',
       // exports: safeJsonParse(row[32], null), // if you add AG later
     }));
