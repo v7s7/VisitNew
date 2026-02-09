@@ -137,19 +137,10 @@ export async function addProperty(data) {
   try {
     const sheets = await getSheetsClient();
 
-    // Generate a unique id and code
+    // Generate id based on row count, code from user or auto
     const allProperties = await getAllProperties();
-    const maxId = allProperties.reduce((max, p) => {
-      const num = parseInt(p.id, 10);
-      return isNaN(num) ? max : Math.max(max, num);
-    }, 0);
-    const newId = String(maxId + 1);
-
-    const maxCode = allProperties.reduce((max, p) => {
-      const num = parseInt(p.code, 10);
-      return isNaN(num) ? max : Math.max(max, num);
-    }, 0);
-    const newCode = String(maxCode + 1);
+    const newId = String(allProperties.length + 1);
+    const newCode = s(data.building) || String(allProperties.length + 1);
 
     // Build the row: A=id, B=code, C=name, D=waqfType, E=propertyType, F=endowedTo,
     // G=building, H=unitNumber, I=road, J=area, K=governorate, L=block, M=defaultLocationLink, N=postcode
