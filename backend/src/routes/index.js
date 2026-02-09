@@ -104,6 +104,7 @@ router.get('/api/health', (req, res) => {
       },
       properties: {
         search: 'GET /api/properties?search=<query>',
+        add: 'POST /api/properties (application/json)',
         getById: 'GET /api/properties/:id',
       },
       upload: {
@@ -134,6 +135,7 @@ router.post('/auth/logout', authController.logout);
 
 // API routes
 router.get('/api/properties', propertiesController.searchPropertiesHandler);
+router.post('/api/properties', propertiesController.addPropertyHandler);
 router.get('/api/properties/:id', propertiesController.getPropertyHandler);
 
 router.post('/api/upload', upload.single('file'), uploadController.uploadFileHandler);

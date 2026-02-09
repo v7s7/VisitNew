@@ -134,3 +134,23 @@
   background: white !important;
   color: var(--primary) !important;
 }
+
+.add-property-btn {
+  width: 100%;
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  background: white;
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 44px;
+}
+
+.add-property-btn:hover {
+  background: var(--gray-50);
+  border-color: var(--primary);
+}

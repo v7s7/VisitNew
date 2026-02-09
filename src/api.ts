@@ -127,6 +127,26 @@ export async function searchProperties(query: string): Promise<Property[]> {
 }
 
 /**
+ * Add a new property to the database
+ * POST /api/properties
+ */
+export async function addProperty(data: Partial<Property>): Promise<{ success: boolean; property: Property; message: string }> {
+  const response = await fetch(buildUrl('/properties'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const message = await parseErrorMessage(response);
+    throw new Error(`Failed to add property: ${message}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Upload a file to Google Drive
  * POST /api/upload
  */
