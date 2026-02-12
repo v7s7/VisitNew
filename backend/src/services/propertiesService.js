@@ -82,7 +82,7 @@ export async function getAllProperties() {
 }
 
 /**
- * Search properties by query (name, code, area, governorate, or postcode)
+ * Search properties by code (column B)
  */
 export async function searchProperties(query) {
   const q = s(query);
@@ -92,19 +92,8 @@ export async function searchProperties(query) {
   const searchTerm = q.toLowerCase();
 
   const results = allProperties.filter((property) => {
-    const name = (property.name || '').toLowerCase();
     const code = (property.code || '').toLowerCase();
-    const area = (property.area || '').toLowerCase();
-    const governorate = (property.governorate || '').toLowerCase();
-    const postcode = (property.postcode || '').toLowerCase();
-
-    return (
-      name.includes(searchTerm) ||
-      code.includes(searchTerm) ||
-      area.includes(searchTerm) ||
-      governorate.includes(searchTerm) ||
-      postcode.includes(searchTerm)
-    );
+    return code.includes(searchTerm);
   });
 
   return results.slice(0, 20);
